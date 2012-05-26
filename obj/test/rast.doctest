@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+
+>>> import obj
+>>> elev = obj.Raster('elevation')
+>>> elev.isopen()
+False
+>>> elev._cols
+>>> elev.open()  
+>>> elev.isopen()
+True
+>>> elev._cols
+28100
+>>> elev.set_from_rast()
+ERROR: You cannot change the region if map is open
+An exception has occurred, use %tb to see the full traceback.
+SystemExit: 1
+
+To exit: use 'exit', 'quit', or Ctrl-D.
+>>> elev.close()
+
+
+>>> new = obj.Raster('new', mode='w')
+>>> elev.open()
+>>> new.open()
+
+

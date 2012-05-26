@@ -1,0 +1,36 @@
+
+Undestand why, use or not the slice do not chage to much: ::
+
+    >>> import obj
+    >>> elev = obj.Raster('elevation')
+    >>> elev.open(_slice = True)
+    >>> %timeit for row in elev: pass  
+    1 loops, best of 3: 6.02 s per loop        
+    
+    >>> elev.close()
+    >>> elev.open(_slice = False)
+    >>> %timeit for row in elev: pass
+    1 loops, best of 3: 5.92 s per loop
+
+Convert the row in to an numpy array is prohibitive using this system:
+    
+    >>> %timeit e0 = np.array([elev[0][i] for i in xrange(elev._cols)])
+    1 loops, best of 3: 15.2 s per loop
+
+try to use the numpy tools, without success 
+    >>> type(elev[0])
+    grass.lib.ctypes_preamble.LP_c_float
+
+    >>> np.ctypeslib.as_array(elev[0], shape=(elev._cols,) )
+
+    >>> %timeit a = np.frombuffer(np.core.multiarray.int_asbuffer(ctypes.addressof(elev[0].contents), 8*elev._cols), float)
+    1000 loops, best of 3: 545 us per loop
+    >>> elev.close()
+
+
+
+
+
+buffer = np.core.multiarray.int_asbuffer(ctypes.addressof(elev[0].contents), elev[0][0].__sizeof__()*elev._cols) \
+a = np.frombuffer(buffer, float)
+a = np.frombuffer(np.core.multiarray.int_asbuffer(ctypes.addressof(elev[0].contents), 8*elev._cols) \, float)
