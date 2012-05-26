@@ -15,7 +15,7 @@ from region import Region
 
 NOT_IMPL_STR = 'Mode: {0}, Method: {1}, not implemented yet!'
 ERROR_MODE_METHD = 'Error: Mode: {0}, Method: {1}, not supported!'
-
+INDXOUTRANGE = "The index (%d) is out of range, have you open the map?."
 
 class Raster():
     """Return a raster object
@@ -82,9 +82,10 @@ class Raster():
         self._fd = None
         ## Private attribute `_buf` that return the file descriptor of the map
         self._buf = None
+        self._pbuf = None
         
     
-    def _get_r_row(self, row):
+    def _r_row(self, row):
         """Private method that return the row using:
             
             * the read mode and 
@@ -94,7 +95,7 @@ class Raster():
         libraster.Rast_get_row(self._fd, self._pbuf, row, self._type)
         return self._pbuf
         
-    def _put_w_row(self, row):
+    def _w_row(self, row):
         """Private method to write the row using:
             
             * the write mode and 
@@ -104,7 +105,7 @@ class Raster():
         libraster.Rast_put_row(self._fd, self._pbuf, row, self._type)
         return self._pbuf
     
-    def _get_r_rowcache(self):
+    def _r_rowcache(self):
         """Private method that return the row using:
             
             * the read mode and 
@@ -113,7 +114,16 @@ class Raster():
         not implemented yet!"""
         pass
     
-    def _get_rw_segment(self):
+    def _w_rowcache(self):
+        """Private method that return the row using:
+            
+            * the read mode and 
+            * `rowcache` method
+            
+        not implemented yet!"""
+        pass
+    
+    def _rw_segment(self):
         """Private method that return the row using:
             
             * the read and write mode and 
@@ -122,7 +132,7 @@ class Raster():
         not implemented yet!"""
         pass
     
-    def _get_rw_array(self):
+    def _rw_array(self):
         """Private method that return the row using:
             
             * the read and write mode and 
@@ -150,7 +160,7 @@ class Raster():
             if key < 0 : #Handle negative indices
                 key += self.region.rows
             if key >= self.region.rows:
-                raise IndexError("The index (%d) is out of range.".format(key))
+                raise IndexError(INDXOUTRANGE.format(key))
             return self.getrow(key)
         else:
             raise TypeError("Invalid argument type.")
@@ -161,9 +171,6 @@ class Raster():
             yield self.__getitem__(irow)
         
 
-    def getrow(self): 
-        """This function is overwrite by the `set_item` method """
-        pass
         
     @property
     def exist(self):
@@ -178,29 +185,29 @@ class Raster():
             return False
             
     def set_item(self):
-        """Function to overwrite the `getrow` method comply with 
+        """Function to determ how to access to the item comply with 
         `mode` and `method`
         """
         if self.mode == 'r':
             if self.method == 'row':
-                self.getrow = self._get_r_row
+                self.getrow = self._r_row
             elif self.method == 'rowcache':
                 print(NOT_IMPL_STR.format(self.mode, self.method))
-                self.getrow = self._get_r_rowcache
+                self.getrow = self._r_rowcache
         elif self.mode == 'w':
             if self.method == 'row':
                 print(NOT_IMPL_STR.format(self.mode, self.method))
-                self.getrow = self.__get_w_row
+                self.getrow = self._w_row
             elif self.method == 'rowcache':
                 print(NOT_IMPL_STR.format(self.mode, self.method))
-                self.getrow = self.__get_w_rowcache
+                self.getrow = self._w_rowcache
         elif self.mode == 'rw':
             if self.method == 'row':
                 print(NOT_IMPL_STR.format(self.mode, self.method))
-                self.getrow = self.__get_rw_segment
+                self.getrow = self._rw_segment
             elif self.method == 'rowcache':
                 print(NOT_IMPL_STR.format(self.mode, self.method))
-                self.getrow = self.__get_rw_array
+                self.getrow = self._rw_array
         else:
             print(ERROR_MODE_METHD.format(self.mode, self.method))
             raise
@@ -227,9 +234,8 @@ class Raster():
         self._pbuf = c.cast(c.c_void_p(self._buf), self._ptype)
         self.set_item()
         self.set_from_rast()
-        #print("fd: {0}, ctyp: {1}, pctyp: {2}, typ: {3}, buf: {4}, pbuf: {5}".format(self._fd, self._type, self._ptype, self.type, self._buf, self._pbuf))
-        #print(self._pbuf[:5])
-        
+
+
     def close(self):
         """Close the map"""
         libgis.G_free(self._buf)
@@ -246,7 +252,8 @@ class Raster():
         if mapset == '': 
             mapset = self.mapset
 
-        libraster.Rast_get_cellhd(rastname, mapset, c.byref(self.region._region))
+        libraster.Rast_get_cellhd(rastname, mapset, 
+                                  c.byref(self.region._region))
 
 if __name__ == "__main__":
     import doctest
