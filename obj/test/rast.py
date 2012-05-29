@@ -18,7 +18,6 @@ new.open()
 
 
 c = 0
-for row in elev:
-    new[c] = row
+for row in elev: new[c] = row
 
 new.close()

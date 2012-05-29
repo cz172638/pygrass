@@ -21,6 +21,7 @@ import numpy as np
 ERR_CREATE = 'Error: You are try to creat a new map, but you are in a read mode'
 ERR_R_ONLY = 'The map is open in read only mode, I can not write!'
 ERR_W_ONLY = 'The map is open in read only mode, I can not read!'
+WARN_OVERWRITE = "Raster map <{0}> already exists and will be overwritten"
 INDXOUTRANGE = "The index (%d) is out of range, have you open the map?."
 MTHD_NOT_SUP = '{0} Method not valid, use: {1}'
 MODE_NOT_SUP = '{0} Mode not valid, use: {1}'
@@ -79,7 +80,7 @@ class Raster():
 
     def __init__(self, name, mapset = "",
                  mode = "r", method = "row",
-                 mtype = "CELL"):
+                 mtype = "CELL", overwrite = False):
         """The constructor need at least the name of the map
         *optional* fields are:
 
@@ -89,13 +90,14 @@ class Raster():
             * `method`: could be: `row`, `rowcache`, `segment`, `array`,
             see: open methods for more details
             * `type`: for new maps you could specify the type."""
-        self.name = name
         self.mapset = mapset
         self.mtype = mtype.upper()
         self.mode = mode
         self.method = method
+        self.overwrite = overwrite
         #self.region = Region()
 
+        self._name = name
         ## Private attribute `_type` is the RASTER_TYPE of the map
         self._type = RAST_TYPE[self.mtype]
         ## Private attribute `_type` is the ctypes pointer
@@ -115,6 +117,18 @@ class Raster():
         # when you open the file, using Rast_window_cols()
         self._cols = None
         self.mslice = False
+
+    def _get_name(self):
+        """Private method to return the Raster name"""
+        return self._name
+
+    def _set_name(self, newname):
+        """Private method to change the Raster name"""
+        if self.exist():
+            self.rename(newname)
+        self._name = newname
+
+    name = property(fget = _get_name, fset = _set_name)
 
 
     def _r_row(self, row):
@@ -215,7 +229,8 @@ class Raster():
 
     def __del__(self):
         #TODO: implement
-        pass
+        self.remove()
+
 
     def exist(self):
         """Return True if the map already exist, and
@@ -281,7 +296,8 @@ class Raster():
             self.__getitem__ = self.getrow
 
 
-    def open(self, mode = '', method = '', mtype = '', mslice = ''):
+    def open(self, mode = '', method = '', mtype = '', mslice = '',
+             overwrite = False):
         """Open the raster if exist or created a new one.
 
         Parameters
@@ -318,33 +334,34 @@ class Raster():
             self.mode = mode
         if method != '':
             self.method = method
-        if mslice != '':
-            self.mslice = mslice
-        # check if exist and instantiate all the privite attributes
-        if self.exist():
-            # the map exist
-            self._fd = libraster.Rast_open_old ( self.name, self.mapset )
-            self._type = libraster.Rast_get_map_type ( self._fd )
-            self._ptype = POINTER_TYPE[self._type]
-            self.mtype = RTYPE_STR[self._type]
-        else:
-            # Create a new map
-            if self.mode == 'r':
-                raise KeyError( _(ERR_CREATE) )
-
-            if self.exist():
-                if self.overwrite:
-                    warning(_("Raster map <{0}> already exists and will be overwritten".format(self)))
-                else:
-                    fatal(_("Raster map <{0}> already exists".format(self) ) )
-
-            if mtype != '':
-                import pdb; pdb.set_trace()
+        if mtype != '':
                 self.mtype = mtype.upper()
                 self._type = RAST_TYPE[self.mtype]
                 self._ptype = POINTER_TYPE[self._type]
-
-            #import pdb; pdb.set_trace()
+        if mslice != '':
+            self.mslice = mslice
+        if overwrite != '':
+            self.overwrite = overwrite
+        self.overwrite
+        # check if exist and instantiate all the privite attributes
+        if self.exist():
+            if self.mode == 'r':
+                # the map exist, read mode
+                self._fd = libraster.Rast_open_old ( self.name, self.mapset )
+                self._type = libraster.Rast_get_map_type ( self._fd )
+                self._ptype = POINTER_TYPE[self._type]
+                self.mtype = RTYPE_STR[self._type]
+            elif self.overwrite:
+                #TODO: may be we should remove the warning.
+                warning(_(WARN_OVERWRITE.format(self)))
+                self._fd = libraster.Rast_open_new( self.name, self._type )
+            else:
+                fatal(_("Raster map <{0}> already exists".format(self) ) )
+        else:
+            # Create a new map
+            if self.mode == 'r':
+                # check if we are in read mode
+                raise KeyError( _(ERR_CREATE) )
             self._fd = libraster.Rast_open_new( self.name, self._type )
         self._buf = libraster.Rast_allocate_buf ( self._type )
         self._pbuf = c.cast(c.c_void_p(self._buf), self._ptype)
@@ -357,13 +374,33 @@ class Raster():
 
     def close(self):
         """Close the map"""
-        libgis.G_free(self._buf)
-        libraster.Rast_close(self._fd)
-        # update rows and cols attributes
-        self._rows = None
-        self._cols = None
+        if self.isopen():
+            libgis.G_free(self._buf)
+            libraster.Rast_close(self._fd)
+            # update rows and cols attributes
+            self._rows = None
+            self._cols = None
+        else:
+            warning(_("The map is already close!"))
 
+    def remove(self):
+        """Remove the map"""
+        if self.isopen():
+            self.close()
+        libgis.G_remove(self.mtype.lower(),
+                        self.name)
 
+    def rename(self, newname):
+        """Rename the map"""
+        if self.isopen():
+                warning(_("The map is open, close before rename"))
+                return
+        if self.exist():
+                libgis.G_rename(c.cast(c.c_char_p(self.mtype.lower())),
+                                c.cast(c.c_char_p(self.name)),
+                                c.cast(c.c_char_p(newname)))
+        else:
+            self._name = newname
 
 
     def set_from_rast(self, rastname='', mapset=''):
