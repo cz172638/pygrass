@@ -8,6 +8,7 @@ Created on Fri May 25 12:56:33 2012
 import ctypes as c
 from grass.script import fatal, warning#, message
 from grass.script import core
+import grass.lib as grasslib
 import grass.lib.gis as libgis
 import grass.lib.raster as libraster
 from region import Region
@@ -44,6 +45,28 @@ POINTER_TYPE = {libraster.CELL_TYPE : c.POINTER(c.c_int),
                libraster.FCELL_TYPE: c.POINTER(c.c_float),
                libraster.DCELL_TYPE: c.POINTER(c.c_double)}
 
+
+class Row():
+    def __init__(self, buf, cols):
+        self.buf = buf
+        self.cols = cols
+
+    def __iter__(self):
+        return (x for x in xrange(self.cols))
+
+    def to_array(self):
+        """Transform a row into a numpy array"""
+        buf = np.core.multiarray.int_asbuffer(c.addressof(self.buf.contents),
+                                              8*self.cols)
+        return np.frombuffer(buf, float)
+
+    def __add__(self, addend):
+        if (isinstance(addend, int) or isinstance(addend, float) ):
+            return Row([self.buf[i] + addend for i in xrange(self.cols)],
+                        self.cols )
+
+    def __getitem__(self, key):
+        return self.buf[key]
 
 
 def row_to_array(row, cols):
@@ -141,7 +164,7 @@ class Raster():
         libraster.Rast_get_row(self._fd, self._pbuf, row, self._type)
         return self._pbuf
 
-    def _w_row(self, row, pbuf):
+    def _w_row(self, pbuf):
         """Private method to write the row sequentially:
 
             * the write mode and
@@ -231,6 +254,15 @@ class Raster():
         #TODO: implement
         self.remove()
 
+    def __add__(self, addend):
+        import pdb; pdb.set_trace()
+        if isinstance( addend, Raster ):
+            # do with C function
+            pass
+        else:
+            # do with C function
+            pass
+
 
     def exist(self):
         """Return True if the map already exist, and
@@ -282,7 +314,10 @@ class Raster():
         if mode_method.has_key(self.mode):
             if mode_method[self.mode].has_key(self.method):
                 self.getrow = mode_method[self.mode][self.method]['get']
-                self.__setitem__ = mode_method[self.mode][self.method]['set']
+                if self.mode == 'w':
+                    self.writerow = mode_method[self.mode][self.method]['set']
+                else:
+                    self.__setitem__ = mode_method[self.mode][self.method]['set']
             else:
                 raise KeyError(_(MTHD_NOT_SUP.format(self.method,
                                  ','.join(mode_method[self.mode].keys() ) ) ) )
@@ -296,7 +331,7 @@ class Raster():
             self.__getitem__ = self.getrow
 
 
-    def open(self, mode = '', method = '', mtype = '', mslice = '',
+    def open(self, mode = '', method = '', mtype = '', mslice = True,
              overwrite = False):
         """Open the raster if exist or created a new one.
 
@@ -396,11 +431,10 @@ class Raster():
                 warning(_("The map is open, close before rename"))
                 return
         if self.exist():
-                libgis.G_rename(c.cast(c.c_char_p(self.mtype.lower())),
-                                c.cast(c.c_char_p(self.name)),
-                                c.cast(c.c_char_p(newname)))
-        else:
-            self._name = newname
+                libgis.G_rename(c.c_char_p(self.mtype.lower()),
+                                c.c_char_p(self.name),
+                                c.c_char_p(newname))
+        self._name = newname
 
 
     def set_from_rast(self, rastname='', mapset=''):

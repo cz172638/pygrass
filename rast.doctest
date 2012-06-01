@@ -9,17 +9,13 @@ False
 >>> elev.isopen()
 True
 >>> elev._cols
-28100
+1500
 >>> elev.set_from_rast()
 ERROR: You cannot change the region if map is open
-An exception has occurred, use %tb to see the full traceback.
-SystemExit: 1
-
-To exit: use 'exit', 'quit', or Ctrl-D.
 >>> elev.close()
 
 >>> elev.open(mslice = True)
->>> for row in elev[:5]: print row[:3]
+>>> for row in elev[:5]: print(row[:3])
 [144.99488830566406, 145.22894287109375, 145.57142639160156]
 [144.99488830566406, 145.22894287109375, 145.57142639160156]
 [144.99488830566406, 145.22894287109375, 145.57142639160156]
@@ -28,28 +24,10 @@ To exit: use 'exit', 'quit', or Ctrl-D.
 
 >>> new = obj.Raster('new', mode = 'w')
 >>> new.open()
->>> c = 0
->>> for row in elev:
-...         new[c] = row
-...
+>>> for row in elev: new.writerow(row)
 >>> new.close()
 >>> new.open()
-ERRORE: Raster map <new@user1> already exists
-An exception has occurred, use %tb to see the full traceback.
-SystemExit: 1
-
-To exit: use 'exit', 'quit', or Ctrl-D.>>>
->>> new.open(overwrite = True)
-ATTENZIONE: Raster map <new@user1> already exists and will be overwritten
->>> c = 0
->>> for row in elev:
-...         new[c] = row
-...
->>> new.close()
->>> new.close()
-ATTENZIONE: The map is already close!
-
-
+ERROR: Raster map <new@user1> already exists
 >>> new.exist()
 True
 >>> new.remove()
@@ -69,9 +47,8 @@ Traceback (most recent call last):
 KeyError: 'Error: You are try to creat a new map, but you are in a read mode'
 
 >>> new2.open('w')
->>> c = 0
 >>> for row in elev:
-...     new[c] = obj.raster.row_to_array(row)/2
+...     new.writerow(obj.raster.row_to_array(row)/2)
 
 
 
