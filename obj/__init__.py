@@ -5,5 +5,5 @@ Created on Fri May 25 12:55:14 2012
 @author: pietro
 """
 
-from raster import Raster
-from region import Region
+from raster import *
+from region import *
