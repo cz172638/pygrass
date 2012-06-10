@@ -5,17 +5,18 @@ Created on Fri May 25 12:56:33 2012
 @author: pietro
 """
 
-import ctypes as c
+import ctypes
 from grass.script import fatal, warning#, message
-from grass.script import core
-import grass.lib as grasslib
+#from grass.script import core
+#import grass.lib as grasslib
 import grass.lib.gis as libgis
 import grass.lib.raster as libraster
 from region import Region
+from row import Row
 
 #import grass.script as grass
 #import grass.temporal as tgis
-import numpy as np
+#import numpy as np
 
 #CELL = np.int
 #FCELL = np.float
@@ -31,11 +32,6 @@ INDXOUTRANGE = "The index (%d) is out of range, have you open the map?."
 MTHD_NOT_SUP = '{0} Method not valid, use: {1}'
 MODE_NOT_SUP = '{0} Mode not valid, use: {1}'
 
-ROWTYPE = {
-'CELL' : np.int,
-'FCELL': np.float,
-'DCELL': np.double}
-
 ## Private dictionary to convert type string into RASTER_TYPE.
 RAST_TYPE = {'CELL' : libraster.CELL_TYPE,
                'FCELL': libraster.FCELL_TYPE,
@@ -45,30 +41,11 @@ RTYPE_STR = {libraster.CELL_TYPE : 'CELL',
                libraster.FCELL_TYPE: 'FCELL',
                libraster.DCELL_TYPE: 'DCELL'}
 ## Private dictionary to convert RASTER_TYPE into ctypes pointer
-POINTER_TYPE = {libraster.CELL_TYPE : c.POINTER(c.c_int),
-               libraster.FCELL_TYPE: c.POINTER(c.c_float),
-               libraster.DCELL_TYPE: c.POINTER(c.c_double)}
+POINTER_TYPE = {libraster.CELL_TYPE : ctypes.POINTER(ctypes.c_int),
+               libraster.FCELL_TYPE: ctypes.POINTER(ctypes.c_float),
+               libraster.DCELL_TYPE: ctypes.POINTER(ctypes.c_double)}
 
 
-class Row(np.ndarray):
-    """Row object: Inherits: "numpy array" [0]:
-    * Internal private C-array as buffer allocated with Rast_allocate_buf
-      using a void pointer
-    * The numpy array uses the private C-array as buffer [1]
-    * No copying of values are needed since Raster_get_row() and
-      Rast_put_row() accept the internal buffer argument
-    * Check for NULL values
-    """
-    pass
-    #self.pbuf = c.cast(c.c_void_p(self.buffer), c.POINTER(c.c_float) )
-
-
-
-def row_to_array(row, cols):
-    """Transform a row into a numpy array"""
-    buf = np.core.multiarray.int_asbuffer(
-          c.addressof(row.contents), 8*cols)
-    return np.frombuffer(buf, float)
 
 class RasterAbstractBase(object):
     """Raster_abstract_base: The base class from which all sub-classes
@@ -122,15 +99,15 @@ class RasterAbstractBase(object):
 
         self._name = name
         ## Private attribute `_type` is the RASTER_TYPE of the map
-        self._type = RAST_TYPE[self.mtype]
+        self._mtype = mtype
         ## Private attribute `_type` is the ctypes pointer
-        self._ptype = c.POINTER(c.c_float)
+        #self._ptype = ctypes.POINTER(ctypes.c_float)
         ## Private attribute `_fd` that return the file descriptor of the map
         self._fd = None
         ## Private attribute `_buf` that return the buffer of the map
-        self._buf = None
+        #self._buf = None
         ## Private attribute `_pbuf` that return the pointer to the buffer
-        self._pbuf = None
+        #self._pbuf = None
         ## Private attribute `_rows` that return the number of rows
         # in active window, When the class is instanced is empty and it is set
         # when you open the file, using Rast_window_rows()
@@ -140,6 +117,19 @@ class RasterAbstractBase(object):
         # when you open the file, using Rast_window_cols()
         self._cols = None
 
+
+    def _get_mtype(self):
+        return self._mtype
+
+    def _set_mtype(self, mtype):
+        if mtype.upper() not in ('CELL', 'FCELL', 'DCELL'):
+            fatal(_("Raser type: {0} not supported".format(mtype) ) )
+            raise
+        self._mtype = mtype
+        self._gtype = RAST_TYPE[self.mtype]
+        #self._ptype = POINTER_TYPE[self._gtype]
+
+    mtype = property(fget = _get_mtype, fset = _set_mtype)
 
     def _get_name(self):
         """Private method to return the Raster name"""
@@ -152,6 +142,42 @@ class RasterAbstractBase(object):
         self._name = newname
 
     name = property(fget = _get_name, fset = _set_name)
+
+    def _get_rows(self):
+        """Private method to return the Raster name"""
+        return self._cols
+
+    def _set_unchangeable(self, new):
+        """Private method to change the Raster name"""
+        warning(_("Unchaneable attribute"))
+
+    rows = property(fget = _get_rows, fset = _set_unchangeable)
+
+    def _get_cols(self):
+        """Private method to return the Raster name"""
+        return self._cols
+
+    cols = property(fget = _get_cols, fset = _set_unchangeable)
+
+    def _get_range(self):
+        if self.mtype == 'CELL':
+            maprange = libraster.Range()
+            libraster.Rast_read_range(self.name, self.mapset,
+                                      ctypes.byref(maprange))
+            self._min = libgis.CELL()
+            self._max = libgis.CELL()
+        else:
+            maprange = libraster.FPRange()
+            libraster.Rast_read_fp_range(self.name, self.mapset,
+                                         ctypes.byref(maprange))
+            self._min = libgis.DCELL()
+            self._max = libgis.DCELL()
+        libraster.Rast_get_fp_range_min_max(ctypes.byref(maprange),
+                                            ctypes.byref(self._min),
+                                            ctypes.byref(self._max))
+        return self._min.value, self._max.value
+
+    range = property(fget = _get_range, fset = _set_unchangeable)
 
     def __unicode__(self):
         return "{name}@{mapset}".format(name = self.name, mapset = self.mapset)
@@ -206,11 +232,11 @@ class RasterAbstractBase(object):
     def close(self):
         """Close the map"""
         if self.isopen():
-            libgis.G_free(self._buf)
             libraster.Rast_close(self._fd)
             # update rows and cols attributes
             self._rows = None
             self._cols = None
+            self._fd = None
         else:
             warning(_("The map is already close!"))
 
@@ -227,9 +253,9 @@ class RasterAbstractBase(object):
             warning(_("The map is open, closing the map"))
             self.close()
         if self.exist():
-            libgis.G_rename(c.c_char_p(self.mtype.lower()),
-                            c.c_char_p(self.name),
-                            c.c_char_p(newname))
+            libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
+                            ctypes.c_char_p(self.name),
+                            ctypes.c_char_p(newname))
         else:
             self._name = newname
 
@@ -239,7 +265,7 @@ class RasterAbstractBase(object):
         is not specify, use itself.
 
         call C function `Rast_get_cellhd`"""
-        if self.isopen:
+        if self.isopen():
             fatal("You cannot change the region if map is open")
             raise
         region = Region()
@@ -249,7 +275,7 @@ class RasterAbstractBase(object):
             mapset = self.mapset
 
         libraster.Rast_get_cellhd(rastname, mapset,
-                                  c.byref(region._region))
+                                  ctypes.byref(region._region))
         # update rows and cols attributes
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
@@ -270,36 +296,31 @@ class RasterRow(RasterAbstractBase):
     """
     def __init__(self, name, mode = 'r', *args, **kargs):
         self.mode = mode
+        self.row = None
         super(RasterRow, self).__init__(name, *args, **kargs)
 
         #self.row = Row()
 
     # mode = "r", method = "row",
-    def __getitem__(self, row):
+    def get_row(self, row):
         """Private method that return the row using:
 
             * the read mode and
             * `row` method
 
         call the `Rast_get_row` function."""
-        libraster.Rast_get_row(self._fd, self._pbuf, row, self._type)
-        #import pdb; pdb.set_trace()
-        buf = np.core.multiarray.int_asbuffer( c.addressof(self._pbuf.contents),
-                                               8*self._cols)
-        self.row = Row( (self._cols, ), buffer = buf)
+        libraster.Rast_get_row(self._fd, self.row.p, row, self._gtype)
         return self.row
 
-    def write_row(self, pbuf):
+    def write_row(self, row):
         """Private method to write the row sequentially:
 
             * the write mode and
             * `row` method
 
         call the `Rast_put_row` function."""
-        self._pbuf = pbuf
-        libraster.Rast_put_row(self._fd, self._pbuf, self._type)
+        libraster.Rast_put_row(self._fd, row.p, self._gtype)
         return None
-
 
 
     def open(self, mode = '', mtype = '', overwrite = False):
@@ -323,31 +344,34 @@ class RasterRow(RasterAbstractBase):
 
         Set all the privite, attributes:
             * self._fd;
-            * self._type
+            * self._gtype
             * self._ptype
             * self._rows and self._cols
         """
+        #import pdb; pdb.set_trace()
         # check input parameters and overwrite attributes
         if mode != '':
             self.mode = mode
         if mtype != '':
                 self.mtype = mtype.upper()
-                self._type = RAST_TYPE[self.mtype]
-                self._ptype = POINTER_TYPE[self._type]
+                self._gtype = RAST_TYPE[self.mtype]
+                self._ptype = POINTER_TYPE[self._gtype]
         if overwrite != '':
             self.overwrite = overwrite
         # check if exist and instantiate all the privite attributes
         if self.exist():
             if self.mode == 'r':
                 # the map exist, read mode
-                self._fd = libraster.Rast_open_old ( self.name, self.mapset )
-                self._type = libraster.Rast_get_map_type ( self._fd )
-                self._ptype = POINTER_TYPE[self._type]
-                self.mtype = RTYPE_STR[self._type]
+                self._fd = libraster.Rast_open_old( self.name, self.mapset )
+                self._gtype = libraster.Rast_get_map_type ( self._fd )
+                #self._ptype = POINTER_TYPE[self._gtype]
+                self.mtype = RTYPE_STR[self._gtype]
             elif self.overwrite:
+                if self._gtype == None:
+                    fatal(_("Raster type not define"))
                 #TODO: may be we should remove the warning.
                 warning(_(WARN_OVERWRITE.format(self)))
-                self._fd = libraster.Rast_open_new( self.name, self._type )
+                self._fd = libraster.Rast_open_new( self.name, self._gtype )
             else:
                 fatal(_("Raster map <{0}> already exists".format(self) ) )
         else:
@@ -355,12 +379,11 @@ class RasterRow(RasterAbstractBase):
             if self.mode == 'r':
                 # check if we are in read mode
                 raise KeyError( _(ERR_CREATE) )
-            self._fd = libraster.Rast_open_new( self.name, self._type )
-        self._buf = libraster.Rast_allocate_buf ( self._type )
-        self._pbuf = c.cast(c.c_void_p(self._buf), self._ptype)
+            self._fd = libraster.Rast_open_new( self.name, self._gtype )
         # read rows and cols from the active region
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
+        self.row = Row(self._cols, self._gtype)
 
 
 class RasterRowIO(RasterAbstractBase):
