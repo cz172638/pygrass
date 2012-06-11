@@ -133,7 +133,7 @@ class RasterAbstractBase(object):
 
     def _get_name(self):
         """Private method to return the Raster name"""
-        return self._name
+        return self._name.strip()
 
     def _set_name(self, newname):
         """Private method to change the Raster name"""
@@ -296,10 +296,9 @@ class RasterRow(RasterAbstractBase):
     """
     def __init__(self, name, mode = 'r', *args, **kargs):
         self.mode = mode
-        self.row = None
+        self.buf = None
         super(RasterRow, self).__init__(name, *args, **kargs)
 
-        #self.row = Row()
 
     # mode = "r", method = "row",
     def get_row(self, row):
@@ -309,8 +308,8 @@ class RasterRow(RasterAbstractBase):
             * `row` method
 
         call the `Rast_get_row` function."""
-        libraster.Rast_get_row(self._fd, self.row.p, row, self._gtype)
-        return self.row
+        libraster.Rast_get_row(self._fd, self.buf.p, row, self._gtype)
+        return self.buf
 
     def write_row(self, row):
         """Private method to write the row sequentially:
@@ -383,7 +382,7 @@ class RasterRow(RasterAbstractBase):
         # read rows and cols from the active region
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
-        self.row = Row(self._cols, self._gtype)
+        self.buf = Row(self._cols, self._gtype)
 
 
 class RasterRowIO(RasterAbstractBase):
