@@ -11,8 +11,11 @@ from grass.script import fatal, warning#, message
 #import grass.lib as grasslib
 import grass.lib.gis as libgis
 import grass.lib.raster as libraster
+import grass.lib.segment as libseg
 from region import Region
 from row import Row
+from segment import Segment
+import numpy as np
 
 #import grass.script as grass
 #import grass.temporal as tgis
@@ -33,18 +36,24 @@ MTHD_NOT_SUP = '{0} Method not valid, use: {1}'
 MODE_NOT_SUP = '{0} Mode not valid, use: {1}'
 
 ## Private dictionary to convert type string into RASTER_TYPE.
-RAST_TYPE = {'CELL' : libraster.CELL_TYPE,
-               'FCELL': libraster.FCELL_TYPE,
-               'DCELL': libraster.DCELL_TYPE}
+TYPE = {'CELL' : {'grass type' : libraster.CELL_TYPE,
+                  'grass def' : libraster.CELL,
+                  'numpy' : np.int32,
+                  'ctypes': ctypes.c_int},
+        'FCELL': {'grass type' : libraster.FCELL_TYPE,
+                  'grass def' : libraster.FCELL,
+                  'numpy' : np.float32,
+                  'ctypes': ctypes.c_float},
+        'DCELL': {'grass type' : libraster.DCELL_TYPE,
+                  'grass def' : libraster.DCELL,
+                  'numpy' : np.float64,
+                  'ctypes': ctypes.c_double}}
+
+
 ## Private dictionary to convert RASTER_TYPE into type string.
 RTYPE_STR = {libraster.CELL_TYPE : 'CELL',
                libraster.FCELL_TYPE: 'FCELL',
                libraster.DCELL_TYPE: 'DCELL'}
-## Private dictionary to convert RASTER_TYPE into ctypes pointer
-POINTER_TYPE = {libraster.CELL_TYPE : ctypes.POINTER(ctypes.c_int),
-               libraster.FCELL_TYPE: ctypes.POINTER(ctypes.c_float),
-               libraster.DCELL_TYPE: ctypes.POINTER(ctypes.c_double)}
-
 
 
 class RasterAbstractBase(object):
@@ -126,7 +135,7 @@ class RasterAbstractBase(object):
             fatal(_("Raser type: {0} not supported".format(mtype) ) )
             raise
         self._mtype = mtype
-        self._gtype = RAST_TYPE[self.mtype]
+        self._gtype = TYPE[self.mtype]['grass type']
         #self._ptype = POINTER_TYPE[self._gtype]
 
     mtype = property(fget = _get_mtype, fset = _set_mtype)
@@ -194,6 +203,9 @@ class RasterAbstractBase(object):
         if isinstance( key, slice ) :
             #Get the start, stop, and step from the slice
             return [self.get_row(ii) for ii in xrange(*key.indices(len(self)))]
+        elif isinstance( key, tuple ) :
+            x, y = key
+            return self.get_point(x, y)
         elif isinstance( key, int ) :
             if key < 0 : #Handle negative indices
                 key += self._rows
@@ -209,7 +221,6 @@ class RasterAbstractBase(object):
         return ( self.__getitem__(irow) for irow in xrange(self._rows) )
 
     def __del__(self):
-        #TODO: implement
         self.remove()
 
 
@@ -353,8 +364,8 @@ class RasterRow(RasterAbstractBase):
             self.mode = mode
         if mtype != '':
                 self.mtype = mtype.upper()
-                self._gtype = RAST_TYPE[self.mtype]
-                self._ptype = POINTER_TYPE[self._gtype]
+                self._gtype = TYPE[self.mtype]['grass type']
+                self._ptype = ctypes.POINTER(TYPE[self.mtype]['ctypes'])
         if overwrite != '':
             self.overwrite = overwrite
         # check if exist and instantiate all the privite attributes
@@ -425,30 +436,89 @@ class RasterSegment(RasterAbstractBase):
           object (only for rows), since r.mapcalc is more sophisticated and
           faster
     """
-    def __init__(self, srows = 64, scols = 64, maxmem = 100):
-        self.srows = srows
-        self.scols = scols
-        self.maxmem = maxmem
+    def __init__(self, name, srows = 64, scols = 64, maxmem = 100,
+                 *args, **kargs):
+        self.segment = Segment(srows, scols, maxmem)
+        super(RasterSegment, self).__init__(name, *args, **kargs)
+
+    def __setitem__(self, key, row):
+        """Return the row of Raster object, slice allowed."""
+        import pdb; pdb.set_trace()
+        if isinstance( key, slice ) :
+            #Get the start, stop, and step from the slice
+            return [self.write_row(ii, row) for ii in xrange(*key.indices(len(self)))]
+        elif isinstance( key, tuple ) :
+            x, y = key
+            return self.write_point(x, y, row)
+        elif isinstance( key, int ) :
+            if key < 0 : #Handle negative indices
+                key += self._rows
+            if key >= self._rows:
+                fatal(INDXOUTRANGE.format(key))
+                raise IndexError
+            return self.write_row(key, row)
+        else:
+            fatal("Invalid argument type.")
+
+
 
     def map2segment(self):
-        pass
+        for row in xrange(self._rows):
+            libraster.Rast_get_row(self._fd, self.buf.p, row, self._gtype)
+            libseg.segment_put_row(ctypes.byref(self.segment.cseg),
+                                   self.buf.p, row)
+        #libgis.G_free(self.buf.p)
+
 
     def segment2map(self):
-        pass
+        for row in xrange(self._rows):
+            libseg.segment_get_row(ctypes.byref(self.segment.cseg),
+                                   self.buf.p, row)
+            libraster.Rast_put_row(self._fd, self.buf.p, self._gtype)
+        #libgis.G_free(self.buf.p)
 
-    def get_row(self):
+
+    def get_row(self, row):
         """Private method that return the row using:
-           the `segment` method
+           the `segment` method"""
+        return self.segment.get_row(row, self.buf)
 
-        not implemented yet!"""
-        pass
-
-    def write_row(self):
+    def write_row(self, rownumb, row):
         """Private method that write the row using:
-           the `segment` method
+           the `segment` method"""
+        return self.segment.write_row(rownumb, row)
 
-        not implemented yet!"""
-        pass
+    def get_point(self, row, col):
+        """Private method that return the row using:
+           the `segment` method"""
+        return self.segment.get_point(row, col)
+
+    def write_point(self, row, col, val):
+        """Private method that write the row using:
+           the `segment` method"""
+        self.segment.val.value = val
+        return self.segment.write_point(row, col)
+
+
+    def open(self):
+        # read rows and cols from the active region
+        self._rows = libraster.Rast_window_rows()
+        self._cols = libraster.Rast_window_cols()
+        # initialize the segment
+        self.segment.open(self)
+        if self.exist():
+            self._fd = libraster.Rast_open_old( self.name, self.mapset )
+            self._gtype = libraster.Rast_get_map_type ( self._fd )
+            self.mtype = RTYPE_STR[self._gtype]
+            self.buf = Row(self._cols, self._gtype)
+            self.map2segment()
+        else:
+            self._gtype = TYPE[self.mtype]['grass type']
+            self._fd = libraster.Rast_open_new( self.name, self._gtype )
+            self.buf = Row(self._cols, self._gtype)
+
+
+
 
 
 class RasterNumpy(RasterAbstractBase):
