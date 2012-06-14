@@ -7,18 +7,11 @@ Created on Mon Jun 11 18:02:27 2012
 import grass.lib.gis as libgis
 import grass.lib.raster as libraster
 import grass.lib.segment as libseg
+from raster_type import TYPE as RTYPE
 import ctypes
 import numpy as np
 
-TYPE = {'CELL' : {'grass' : libraster.CELL_TYPE,
-                  'numpy' : np.int32,
-                  'ctypes': ctypes.c_int},
-        'FCELL': {'grass' : libraster.FCELL_TYPE,
-                  'numpy' : np.float32,
-                  'ctypes': ctypes.c_float},
-        'DCELL': {'grass' : libraster.DCELL_TYPE,
-                  'numpy' : np.float64,
-                  'ctypes': ctypes.c_double}}
+
 
 class CSeg(ctypes.Structure):
     """
@@ -63,8 +56,8 @@ class Segment(object):
     def open(self, mapobj):
         """
         """
-        self.val = TYPE[mapobj.mtype]['grass def']()
-        size = ctypes.sizeof( TYPE[mapobj.mtype]['ctypes'] )
+        self.val = RTYPE[mapobj.mtype]['grass def']()
+        size = ctypes.sizeof( RTYPE[mapobj.mtype]['ctypes'] )
         file_name = libgis.G_tempfile()
         #import pdb; pdb.set_trace()
         libseg.segment_open(ctypes.byref(self.cseg), file_name,
@@ -102,28 +95,30 @@ class Segment(object):
         """
         libseg.segment_get(ctypes.byref(self.cseg),
                            ctypes.byref(self.val), row, col)
-        return self.val
+        return self.val.value
 
     def write_point(self, row, col):
+        #import pdb; pdb.set_trace()
         libseg.segment_put(ctypes.byref(self.cseg),
                            ctypes.byref(self.val), row, col)
 
-    def get_address(self, row, col):
-        """
-        segment_address_fast(const SEGMENT * SEG, off_t row, off_t col, int *n,
-                             int *index)
-        """
-
-
     def get_seg_number(self, row, col):
-        pass
+        """row/segment_info->srows * segment_info->ncols / segment_info->scols +
+           col/segment_info->scols;
+        """
+        return row/self.srows * self.cols / self.scols + col / self.scols
 
     def get_seg(self, seg_number):
-        pass
+        return self.cseg.scb[seg_number]
 
-    def flush(self):
-        pass
 
     def write_seg(self, seg_number):
         pass
 
+
+    def flush(self):
+        pass
+
+
+    def close(self):
+        pass
