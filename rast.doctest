@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+#
+# to test these examples run from the grass shell
+# python -m doctest rast.doctest -v
+#
 
 =========
 Raster
@@ -31,7 +35,7 @@ True
 
 >>> new = obj.RasterRow('new', mode = 'w')
 >>> new.open()
->>> for row in elev: new.write_row(row < 145)
+>>> for row in elev: new.put_row(row < 145)
 >>> new.close()
 >>> elev.close()
 >>> new.exist()
@@ -67,47 +71,13 @@ True
 >>> new[0, 0] = 10
 >>> new[0, 0]
 10
+>>> new.close()
+>>> new.exist()
+True
+>>> new.remove()
+>>> elev.close()
 
 
-
-Exception raised:
-    Traceback (most recent call last):
-      File "/usr/lib/python2.7/doctest.py", line 1289, in __run
-        compileflags, 1) in test.globs
-      File "<doctest rast.doctest[8]>", line 1, in <module>
-        elev.open()
-      File "obj/raster.py", line 384, in open
-        self.buf = Buffer((self._cols,), self._gtype)
-      File "obj/row.py", line 17, in __new__
-        obj = np.ndarray.__new__(cls, shape, RTYPE[mtype]['numpy'],
-    KeyError: 1
-
-
-
-north:      228500
-south:      215000
-west:       630000
-east:       645000
-nsres:      10
-ewres:      10
-rows:       1350
-cols:       1500
-
-N-E
-r.what input=elevation coordinates=645000,228500
-645000|228500||58.18311
-
-S-E
-r.what input=elevation coordinates=630000,228500
-630000|228500||141.9961
-
-S-W
-r.what input=elevation coordinates=630000,215000
-630000|215000||126.695
-
-N-W
-r.what input=elevation coordinates=645000,215000
-645000|215000||85.55479
 
 
 

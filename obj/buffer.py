@@ -9,6 +9,9 @@ import ctypes
 import numpy as np
 
 
+libc = ctypes.cdll.LoadLibrary('libc.so.6')
+
+
 class Buffer(np.ndarray):
 
     def __new__(cls, shape, mtype='FCELL', buffer=None, offset=0,
@@ -17,7 +20,6 @@ class Buffer(np.ndarray):
         obj = np.ndarray.__new__(cls, shape, RTYPE[mtype]['numpy'],
                                  buffer, offset, strides, order)
         obj.pointer_type = ctypes.POINTER(RTYPE[mtype]['ctypes'])
-        #FIXME: copy the buffer with memcpy and the give the pointer to the copy
         obj.p = obj.ctypes.data_as(obj.pointer_type)
         obj.mtype = mtype
         return obj

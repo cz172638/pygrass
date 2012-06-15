@@ -28,97 +28,105 @@ class Segment(object):
         self.maxmem = maxmem
         self.cseg = libseg.SEGMENT()
 
-    @property
     def rows(self):
         return libraster.Rast_window_rows()
 
-    @property
     def cols(self):
         return libraster.Rast_window_cols()
 
-    @property
     def nseg(self):
-        rows = self.rows
-        cols = self.cols
+        rows = self.rows()
+        cols = self.cols()
         return ( ( rows + self.srows - 1 ) / self.srows ) * \
                ( ( cols + self.scols - 1 ) / self.scols )
 
-    @property
     def segments_in_mem(self):
         if self.maxmem > 0 and self.maxmem < 100:
-            seg_in_mem = ( self.maxmem * self.nseg ) / 100
+            seg_in_mem = ( self.maxmem * self.nseg() ) / 100
         else:
-            seg_in_mem = 4 * ( self.rows / self.srows + \
-                               self.cols / self.scols + 2 )
+            seg_in_mem = 4 * ( self.rows() / self.srows + \
+                               self.cols() / self.scols + 2 )
         if seg_in_mem == 0: seg_in_mem = 1
         return seg_in_mem
 
     def open(self, mapobj):
-        """
+        """Open a segment
         """
         self.val = RTYPE[mapobj.mtype]['grass def']()
         size = ctypes.sizeof( RTYPE[mapobj.mtype]['ctypes'] )
         file_name = libgis.G_tempfile()
         #import pdb; pdb.set_trace()
         libseg.segment_open(ctypes.byref(self.cseg), file_name,
-                                         self.rows, self.cols,
+                                         self.rows(), self.cols(),
                                          self.srows, self.scols,
                                          size,
-                                         self.nseg)
+                                         self.nseg())
+        self.flush()
 
-#        file_name = libgis.G_tempfile()
-#        mapobj.temp_file = file(file_name, 'w')
-#        #import pdb; pdb.set_trace()
-#        libseg.segment_format(mapobj.temp_file.fileno(), self.rows, self.cols,
-#                                 self.srows, self.scols, size)
-#        # TODO: why should I close and then re-open it?
-#        mapobj.temp_file.close()
-#        mapobj.temp_file = open(file_name, 'w')
-#        libseg.segment_init(ctypes.byref(self.cseg), mapobj.temp_file.fileno(),
-#                            self.segments_in_mem )
+    def format(self, mapobj, file_name = '', fill = True):
+        """TODO: add documentation
+        """
+        if file_name == '': file_name = libgis.G_tempfile()
+        mapobj.temp_file = file(file_name, 'w')
+        size = ctypes.sizeof( RTYPE[mapobj.mtype]['ctypes'] )
+        if fill:
+            libseg.segment_format(mapobj.temp_file.fileno(), self.rows(),
+                                  self.cols(), self.srows, self.scols, size)
+        else:
+            libseg.segment_format_nofill(mapobj.temp_file.fileno(),self.rows(),
+                                  self.cols(), self.srows, self.scols, size)
+        # TODO: why should I close and then re-open it?
+        mapobj.temp_file.close()
 
+    def init(self, mapobj, file_name = ''):
+        if file_name == '': file_name = mapobj.temp_file.name
+        mapobj.temp_file = open(file_name, 'w')
+        libseg.segment_init(ctypes.byref(self.cseg), mapobj.temp_file.fileno(),
+                            self.segments_in_mem )
 
-    def get_row(self, row, buf):
-        """Private method that return the row using:
-           the `segment` method"""
-        libseg.segment_get_row(ctypes.byref(self.cseg), buf.p, row)
+    def get_row(self, row_index, buf):
+        """Return the row using, the `segment` method"""
+        libseg.segment_get_row(ctypes.byref(self.cseg), buf.p, row_index)
         return buf
 
+    def put_row(self, row_index, buf):
+        """Write the row using the `segment` method"""
+        libseg.segment_put_row(ctypes.byref(self.cseg), buf.p, row_index)
 
-    def write_row(self, row, buf):
-        """Private method that write the row using:
-           the `segment` method!"""
-        libseg.segment_put_row(ctypes.byref(self.cseg), buf.p, row)
-
-    def get_point(self, row, col):
-        """
+    def get(self, row_index, col_index):
+        """Return the value of the map
         """
         libseg.segment_get(ctypes.byref(self.cseg),
-                           ctypes.byref(self.val), row, col)
+                           ctypes.byref(self.val), row_index, col_index)
         return self.val.value
 
-    def write_point(self, row, col):
-        #import pdb; pdb.set_trace()
-        libseg.segment_put(ctypes.byref(self.cseg),
-                           ctypes.byref(self.val), row, col)
-
-    def get_seg_number(self, row, col):
-        """row/segment_info->srows * segment_info->ncols / segment_info->scols +
-           col/segment_info->scols;
+    def put(self, row_index, col_index):
+        """Write the value to the map
         """
-        return row/self.srows * self.cols / self.scols + col / self.scols
+        libseg.segment_put(ctypes.byref(self.cseg),
+                           ctypes.byref(self.val), row_index, col_index)
 
-    def get_seg(self, seg_number):
-        return self.cseg.scb[seg_number]
-
-
-    def write_seg(self, seg_number):
-        pass
-
+    def get_seg_number(self, row_index, col_index):
+        """Return the segment number
+        """
+        return row_index / self.srows * self.cols / self.scols + \
+               col_index / self.scols
 
     def flush(self):
-        pass
-
+        """Flush pending updates to disk.
+        Forces all pending updates generated by segment_put() to be written to
+        the segment file seg. Must be called after the final segment_put()
+        to force all pending updates to disk. Must also be called before the
+        first call to segment_get_row."""
+        libseg.segment_flush(ctypes.byref(self.cseg))
 
     def close(self):
-        pass
+        """Free memory allocated to segment and delete temp file.  """
+        libseg.segment_close(ctypes.byref(self.cseg))
+
+    def release(self):
+        """Free memory allocated to segment.
+        Releases the allocated memory associated with the segment file seg.
+        Note: Does not close the file. Does not flush the data which may be
+        pending from previous segment_put() calls."""
+        libseg.segment_release(ctypes.byref(self.cseg))

@@ -193,7 +193,7 @@ class RasterAbstractBase(object):
             return (self.get_row(ii) for ii in xrange(*key.indices(len(self))))
         elif isinstance( key, tuple ) :
             x, y = key
-            return self.get_point(x, y)
+            return self.get(x, y)
         elif isinstance( key, int ) :
             if key < 0 : #Handle negative indices
                 key += self._rows
@@ -300,17 +300,18 @@ class RasterRow(RasterAbstractBase):
 
 
     # mode = "r", method = "row",
-    def get_row(self, row):
+    def get_row(self, row, row_buffer = None):
         """Private method that return the row using:
 
             * the read mode and
             * `row` method
 
         call the `Rast_get_row` function."""
-        libraster.Rast_get_row(self._fd, self.row_buffer.p, row, self._gtype)
-        return self.row_buffer
+        if row_buffer == None: row_buffer = Buffer((self._cols,), self.mtype)
+        libraster.Rast_get_row(self._fd, row_buffer.p, row, self._gtype)
+        return row_buffer
 
-    def write_row(self, row):
+    def put_row(self, row):
         """Private method to write the row sequentially:
 
             * the write mode and
@@ -381,7 +382,6 @@ class RasterRow(RasterAbstractBase):
         # read rows and cols from the active region
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
-        self.row_buffer = Buffer((self._cols,), self.mtype)
 
 
 class RasterRowIO(RasterAbstractBase):
@@ -397,7 +397,7 @@ class RasterRowIO(RasterAbstractBase):
         not implemented yet!"""
         pass
 
-    def write_row(self):
+    def put_row(self):
         """Private method that return the row using:
 
             * the read mode and
@@ -434,64 +434,55 @@ class RasterSegment(RasterAbstractBase):
         #import pdb; pdb.set_trace()
         if isinstance( key, slice ) :
             #Get the start, stop, and step from the slice
-            return [self.write_row(ii, row) for ii in xrange(*key.indices(len(self)))]
+            return [self.put_row(ii, row) for ii in xrange(*key.indices(len(self)))]
         elif isinstance( key, tuple ) :
             x, y = key
-            return self.write_point(x, y, row)
+            return self.put(x, y, row)
         elif isinstance( key, int ) :
             if key < 0 : #Handle negative indices
                 key += self._rows
             if key >= self._rows:
                 fatal(INDXOUTRANGE.format(key))
                 raise IndexError
-            return self.write_row(key, row)
+            return self.put_row(key, row)
         else:
             fatal("Invalid argument type.")
 
-
-
     def map2segment(self):
+        row_buffer = Buffer((self._cols), self.mtype)
         for row in xrange(self._rows):
-            libraster.Rast_get_row(self._fd, self.row_buffer.p, row, self._gtype)
+            libraster.Rast_get_row(self._fd, row_buffer.p, row, self._gtype)
             libseg.segment_put_row(ctypes.byref(self.segment.cseg),
-                                   self.row_buffer.p, row)
-        #libgis.G_free(self.row_buffer.p)
-
+                                   row_buffer.p, row)
 
     def segment2map(self):
+        row_buffer = Buffer((self._cols), self.mtype)
         for row in xrange(self._rows):
             libseg.segment_get_row(ctypes.byref(self.segment.cseg),
-                                   self.row_buffer.p, row)
-            libraster.Rast_put_row(self._fd, self.row_buffer.p, self._gtype)
-        #libgis.G_free(self.row_buffer.p)
+                                   row_buffer.p, row)
+            libraster.Rast_put_row(self._fd, row_buffer.p, self._gtype)
 
-
-    def get_row(self, row):
+    def get_row(self, row, row_buffer = None):
         """Private method that return the row using:
            the `segment` method"""
-        return self.segment.get_row(row, self.row_buffer)
+        if row_buffer == None: row_buffer = Buffer((self._cols), self.mtype)
+        return self.segment.get_row(row, row_buffer)
 
-    def write_row(self, rownumb, row):
+    def put_row(self, rownumb, row):
         """Private method that write the row using:
            the `segment` method"""
-        return self.segment.write_row(rownumb, row)
+        return self.segment.put_row(rownumb, row)
 
-    def get_point(self, row, col):
+    def get(self, row, col):
         """Private method that return the row using:
            the `segment` method"""
-        return self.segment.get_point(row, col)
+        return self.segment.get(row, col)
 
-    def write_point(self, row, col, val):
+    def put(self, row, col, val):
         """Private method that write the row using:
            the `segment` method"""
         self.segment.val.value = val
-        return self.segment.write_point(row, col)
-
-    def get_seg(self, seg_number):
-        pass
-
-    def write_seg(self, seg_number, seg):
-        pass
+        return self.segment.put(row, col)
 
     def open(self, mtype = ''):
         # read rows and cols from the active region
@@ -504,18 +495,31 @@ class RasterSegment(RasterAbstractBase):
             # initialize the segment, I need to determin the mtype of the map
             # before to open the segment
             self.segment.open(self)
-            self.row_buffer = Buffer((self._cols,), self.mtype)
-            self.seg_buffer = Buffer((self.segment.srows, self.segment.scols),
-                                     self.mtype)
             self.map2segment()
+            libraster.Rast_close(self._fd)
         else:
             if mtype: self.mtype = mtype
             self._gtype = RTYPE[self.mtype]['grass type']
-            self._fd = libraster.Rast_open_new( self.name, self._gtype )
             self.segment.open(self)
-            self.row_buffer = Buffer((self._cols,), self.mtype)
-            self.seg_buffer = Buffer((self.segment.srows, self.segment.scols),
-                                     self.mtype)
+        self._fd = libraster.Rast_open_new( self.name, self._gtype )
+
+
+    def close(self, rm_temp_file = True):
+        if self.isopen():
+            self.segment.flush()
+            self.segment2map()
+            if rm_temp_file:
+                self.segment.close()
+            else:
+                self.segment.release()
+            libraster.Rast_close(self._fd)
+            # update rows and cols attributes
+            self._rows = None
+            self._cols = None
+            self._fd = None
+        else:
+            warning(_("The map is already close!"))
+
 
 
 
@@ -538,7 +542,7 @@ class RasterNumpy(RasterAbstractBase):
         not implemented yet!"""
         pass
 
-    def write_row(self):
+    def put_row(self):
         """Private method that write the row using:
            the `array` method
 

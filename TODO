@@ -1,20 +1,8 @@
-Questions
----------
-
-The Segment Class
-
-
 
 Next steps
 ----------
 
-* Check If is possible to merge Row => Buffer
-* Add to the RasterSegment the methods:
-    - close
-    - flush
-    - get_seg, that return a 2D Buffer
-    - write_seg, that write a 2D Buffer
 * Add docstring to each class and methods
-* Add doctest
+* Add more doctest
 * Add unittest
 * Add benchmark rmapcalc/pygrass test a Cython class(?)
