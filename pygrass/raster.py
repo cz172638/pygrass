@@ -14,7 +14,7 @@ import grass.lib.raster as libraster
 import grass.lib.segment as libseg
 from raster_type import TYPE as RTYPE
 from region import Region
-from row import Buffer
+from buffer import Buffer
 from segment import Segment
 import numpy as np
 
