@@ -1,13 +1,19 @@
+.. _raster-label:
 
 Raster
 ======
 
 PyGrass use 4 different Raster classes, that respect the 4 different approaches
 of C grass API. PyGrass Allow user to open the maps, in read and write mode,
-row by row (``RasterRow`` class), using the RowIO library (``RasterRowIO``
-class), using the segmentation library that allow users to read and write the
-map at the same time (``RasterSegment`` class), and using the numpy interface
-to the map (``RasterNumpy`` class).
+row by row (:ref:`RasterRow-label` class) using the
+`Raster library <http://grass.osgeo.org/programming7/rasterlib.html>`_,
+using the
+`RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_
+(:ref:`RasterRowIO-label` class), using the
+`Segmentation library <http://grass.osgeo.org/programming7/segmentlib.html>`_
+that allow users to read and write the
+map at the same time (:ref:`RasterSegment-label` class), and using the numpy interface
+to the map (:ref:`RasterNumpy-label` class).
 
 All these classes share common methods and attributes, necessary to address
 common tasks as rename, remove, open, close, exist, isopen.
@@ -42,6 +48,7 @@ We can rename the map:   ::
     elevation@PERMANENT
 
 
+.. _RasterRow-label:
 
 RastRow
 -------
@@ -99,10 +106,13 @@ time you are writing a new map, the row is add to the file as the last row.
     False
 
 
+.. _RasterRowIO-label:
 
 RasterRowIO
 -----------
 
+
+.. _RasterSegment-label:
 
 
 RastSegment
@@ -171,6 +181,8 @@ to write a single value to the map. ::
     >>> elev.remove()
 
 
+
+.. _RasterNumpy-label:
 
 RasterNumpy
 -----------
