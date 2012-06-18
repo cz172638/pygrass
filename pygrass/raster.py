@@ -53,28 +53,6 @@ class RasterAbstractBase(object):
     * Implements get and set region methods
     * Implements color, history and category handling
     * Renaming, deletion, ...
-
-    Examples
-    ==========
-
-    ::
-
-        # import the raster function
-        >>> import obj
-        # instantiate a Raster
-        >>> dtm = obj.Raster('dtm')
-        # open the raster in read mode 'r'
-        >>> dtm.open()
-        # get access
-        >>> for row in dtm[:5]: print(row[:3])
-        [718.0910034179688, 717.8709716796875, 717.551025390625]
-        [718.0910034179688, 717.8709716796875, 717.551025390625]
-        [718.0910034179688, 717.8709716796875, 717.551025390625]
-        [718.0910034179688, 717.8709716796875, 717.551025390625]
-        [718.0910034179688, 717.8709716796875, 717.551025390625]
-        >>> dtm[5][:3]
-        [718.051025390625, 717.7310180664062, 717.4210205078125]
-        >>> dtm.close()
     """
 
     def __init__(self, name, mapset = "",
@@ -83,11 +61,10 @@ class RasterAbstractBase(object):
         *optional* fields are:
 
             * `mapset`: to specify the mapset
-            * `mode`: could be: `r`, `w`, `rw`, see: open methods for more
-            details
-            * `method`: could be: `row`, `rowcache`, `segment`, `array`,
-            see: open methods for more details
-            * `type`: for new maps you could specify the type."""
+            * `mtype`: for new maps you could specify the type:
+                - CELL;
+                - FCELL;
+                - DCELL."""
         self.mapset = mapset
         self.mtype = mtype.upper()
         self.overwrite = overwrite
@@ -96,14 +73,8 @@ class RasterAbstractBase(object):
         self._name = name
         ## Private attribute `_type` is the RASTER_TYPE of the map
         self._mtype = mtype
-        ## Private attribute `_type` is the ctypes pointer
-        #self._ptype = ctypes.POINTER(ctypes.c_float)
         ## Private attribute `_fd` that return the file descriptor of the map
         self._fd = None
-        ## Private attribute `_buf` that return the buffer of the map
-        #self._buf = None
-        ## Private attribute `_pbuf` that return the pointer to the buffer
-        #self._pbuf = None
         ## Private attribute `_rows` that return the number of rows
         # in active window, When the class is instanced is empty and it is set
         # when you open the file, using Rast_window_rows()
@@ -123,7 +94,6 @@ class RasterAbstractBase(object):
             raise
         self._mtype = mtype
         self._gtype = RTYPE[self.mtype]['grass type']
-        #self._ptype = POINTER_RTYPE[self._gtype]
 
     mtype = property(fget = _get_mtype, fset = _set_mtype)
 
@@ -295,29 +265,21 @@ class RasterRow(RasterAbstractBase):
     """
     def __init__(self, name, mode = 'r', *args, **kargs):
         self.mode = mode
-        self.row_buffer = None
         super(RasterRow, self).__init__(name, *args, **kargs)
 
 
     # mode = "r", method = "row",
     def get_row(self, row, row_buffer = None):
-        """Private method that return the row using:
-
-            * the read mode and
-            * `row` method
-
-        call the `Rast_get_row` function."""
+        """Private method that return the row using the read mode
+        call the `Rast_get_row` C function.
+        """
         if row_buffer == None: row_buffer = Buffer((self._cols,), self.mtype)
         libraster.Rast_get_row(self._fd, row_buffer.p, row, self._gtype)
         return row_buffer
 
     def put_row(self, row):
-        """Private method to write the row sequentially:
-
-            * the write mode and
-            * `row` method
-
-        call the `Rast_put_row` function."""
+        """Private method to write the row sequentially.
+        """
         libraster.Rast_put_row(self._fd, row.p, self._gtype)
         return None
 
@@ -329,13 +291,10 @@ class RasterRow(RasterAbstractBase):
         ------------
 
         mode: string
-            Specify if the map will be open with read, write, read & write
-            'r', 'w'
+            Specify if the map will be open with read or write mode ('r', 'w')
         type: string
-            If a new map is open, specify the type of the map:
-                `CELL`
-                `FCELL`
-                `DCELL`
+            If a new map is open, specify the type of the map(`CELL`, `FCELL`,
+            `DCELL`)
 
 
         if the map already exist, automatically check the type and set:
@@ -344,17 +303,14 @@ class RasterRow(RasterAbstractBase):
         Set all the privite, attributes:
             * self._fd;
             * self._gtype
-            * self._ptype
             * self._rows and self._cols
         """
-        #import pdb; pdb.set_trace()
         # check input parameters and overwrite attributes
         if mode != '':
             self.mode = mode
         if mtype != '':
                 self.mtype = mtype.upper()
                 self._gtype = RTYPE[self.mtype]['grass type']
-                self._ptype = ctypes.POINTER(RTYPE[self.mtype]['ctypes'])
         if overwrite != '':
             self.overwrite = overwrite
         # check if exist and instantiate all the privite attributes
@@ -363,7 +319,6 @@ class RasterRow(RasterAbstractBase):
                 # the map exist, read mode
                 self._fd = libraster.Rast_open_old( self.name, self.mapset )
                 self._gtype = libraster.Rast_get_map_type ( self._fd )
-                #self._ptype = POINTER_RTYPE[self._gtype]
                 self.mtype = RTYPE_STR[self._gtype]
             elif self.overwrite:
                 if self._gtype == None:
@@ -431,7 +386,6 @@ class RasterSegment(RasterAbstractBase):
 
     def __setitem__(self, key, row):
         """Return the row of Raster object, slice allowed."""
-        #import pdb; pdb.set_trace()
         if isinstance( key, slice ) :
             #Get the start, stop, and step from the slice
             return [self.put_row(ii, row) for ii in xrange(*key.indices(len(self)))]
@@ -449,6 +403,8 @@ class RasterSegment(RasterAbstractBase):
             fatal("Invalid argument type.")
 
     def map2segment(self):
+        """Transform an existing map to segment files.
+        """
         row_buffer = Buffer((self._cols), self.mtype)
         for row in xrange(self._rows):
             libraster.Rast_get_row(self._fd, row_buffer.p, row, self._gtype)
@@ -456,6 +412,8 @@ class RasterSegment(RasterAbstractBase):
                                    row_buffer.p, row)
 
     def segment2map(self):
+        """Transform the segment files to a map.
+        """
         row_buffer = Buffer((self._cols), self.mtype)
         for row in xrange(self._rows):
             libseg.segment_get_row(ctypes.byref(self.segment.cseg),
@@ -463,28 +421,72 @@ class RasterSegment(RasterAbstractBase):
             libraster.Rast_put_row(self._fd, row_buffer.p, self._gtype)
 
     def get_row(self, row, row_buffer = None):
-        """Private method that return the row using:
-           the `segment` method"""
+        """Return the row using the `segment.get_row` method
+
+        Parameters
+        ------------
+
+        row: integer
+            Specify the row number;
+        row_buffer: Buffer object, optional
+            Specify the Buffer object that will be instantiate.
+        """
         if row_buffer == None: row_buffer = Buffer((self._cols), self.mtype)
         return self.segment.get_row(row, row_buffer)
 
-    def put_row(self, rownumb, row):
-        """Private method that write the row using:
-           the `segment` method"""
-        return self.segment.put_row(rownumb, row)
+    def put_row(self, row, row_buffer):
+        """Write the row using the `segment.put_row` method
+
+        Parameters
+        ------------
+
+        row: integer
+            Specify the row number;
+        row_buffer: Buffer object
+            Specify the Buffer object that will be write to the map.
+        """
+        return self.segment.put_row(row, row_buffer)
 
     def get(self, row, col):
-        """Private method that return the row using:
-           the `segment` method"""
+        """Return the map value using the `segment.get` method
+
+        Parameters
+        ------------
+
+        row: integer
+            Specify the row number;
+        col: integer
+            Specify the column number.
+        """
         return self.segment.get(row, col)
 
     def put(self, row, col, val):
-        """Private method that write the row using:
-           the `segment` method"""
+        """Write the value to the map using the `segment.put` method
+
+        Parameters
+        ------------
+
+        row: integer
+            Specify the row number;
+        col: integer
+            Specify the column number.
+        val: value
+            Specify the value that will be write to the map cell.
+        """
         self.segment.val.value = val
         return self.segment.put(row, col)
 
     def open(self, mtype = ''):
+        """Open the map, if the map already exist: determine the map type
+        and copy the map to the segment files;
+        else, open a new segment map.
+
+        Parameters
+        ------------
+
+        mtype: string, optional
+            Specify the map type, valid only for new maps: CELL, FCELL, DCELL;
+        """
         # read rows and cols from the active region
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
@@ -504,11 +506,19 @@ class RasterSegment(RasterAbstractBase):
         self._fd = libraster.Rast_open_new( self.name, self._gtype )
 
 
-    def close(self, rm_temp_file = True):
+    def close(self, rm_temp_files = True):
+        """Close the map, copy the segment files to the map.
+
+        Parameters
+        ------------
+
+        rm_temp_files: bool
+            If True all the segments file will be removed.
+        """
         if self.isopen():
             self.segment.flush()
             self.segment2map()
-            if rm_temp_file:
+            if rm_temp_files:
                 self.segment.close()
             else:
                 self.segment.release()

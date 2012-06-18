@@ -1,0 +1,178 @@
+
+Raster
+======
+
+PyGrass use 4 different Raster classes, that respect the 4 different approaches
+of C grass API. PyGrass Allow user to open the maps, in read and write mode,
+row by row (``RasterRow`` class), using the RowIO library (``RasterRowIO``
+class), using the segmentation library that allow users to read and write the
+map at the same time (``RasterSegment`` class), and using the numpy interface
+to the map (``RasterNumpy`` class).
+
+All these classes share common methods and attributes, necessary to address
+common tasks as rename, remove, open, close, exist, isopen.
+In the next exmples we instantiate a RasterRow object. ::
+
+    >>> import pygrass
+    >>> elev = pygrass.RasterRow('elevation')
+    >>> elev.name
+    'elevation'
+    >>> print(elev)
+    elevation@PERMANENT
+    >>> elev.exist()
+    True
+    >>> elev.isopen()
+    False
+    >>> new = pygrass.RasterRow('new')
+    >>> new.exist()
+    False
+    >>> new.isopen()
+    False
+
+
+We can rename the map:   ::
+
+    >>> # setting the attribute
+    >>> elev.name = 'elev'
+    >>> print(elev)
+    elev@PERMANENT
+    >>> # or using the rename methods
+    >>> elev.rename('elevation')
+    >>> print(elev)
+    elevation@PERMANENT
+
+
+
+RastRow
+-------
+
+The RasterRow class use the Grass C API to read and write the map, there is not
+support to read and write to the same map at the same time, for this
+functionality, please see the RasterSegment class.
+The RasterRow class allow to read in a randomly order the row from a map, but
+it is only possible to write the map using a sequence order, therefore every
+time you are writing a new map, the row is add to the file as the last row.
+
+::
+
+    >>> pygrass = reload(pygrass)
+    >>> elev = pygrass.RasterRow('elevation')
+    >>> # the cols attribute is set from the current region only when the map is open
+    >>> elev.cols
+    >>> elev.open()
+    >>> elev.isopen()
+    True
+    >>> elev.cols
+    1500
+    >>> # we can read the elevation map, row by row
+    >>> for row in elev[:5]: print(row[:3])
+    [ 141.99613953  141.27848816  141.37904358]
+    [ 142.90461731  142.39450073  142.68611145]
+    [ 143.81854248  143.54707336  143.83972168]
+    [ 144.56524658  144.58493042  144.86477661]
+    [ 144.99488831  145.22894287  145.57142639]
+    >>> # we can open a new map in write mode
+    >>> new = pygrass.RasterRow('new', mode = 'w')
+    >>> new.open()
+    >>> # for each elev row we can perform computation, and write the result into
+    >>> # the new map
+    >>> for row in elev:
+    ...     new.put_row(row < 144)
+    ...
+    >>> # close the maps
+    >>> new.close()
+    >>> elev.close()
+    >>> # check if the map exist
+    >>> new.exist()
+    True
+    >>> # we can open the map in read mode
+    >>> new.open('r')
+    >>> for row in new[:5]: print(row[:3])
+    [1 1 1]
+    [1 1 1]
+    [1 1 1]
+    [0 0 0]
+    [0 0 0]
+    >>> new.close()
+    >>> new.remove()
+    >>> new.exist()
+    False
+
+
+
+RasterRowIO
+-----------
+
+
+
+RastSegment
+-----------
+
+The RasterSegment class use the grass segment library, it work dividing the
+raster map into small different files, that grass read load into the memory
+and write to the hardisk.
+The segment library allow to open a map in a read-write mode. ::
+
+    >>> pygrass = reload(pygrass)
+    >>> elev = pygrass.RasterSegment('elevation')
+    >>> elev.open()
+    >>> for row in elev[:5]: print(row[:3])
+    [ 141.99613953  141.27848816  141.37904358]
+    [ 142.90461731  142.39450073  142.68611145]
+    [ 143.81854248  143.54707336  143.83972168]
+    [ 144.56524658  144.58493042  144.86477661]
+    [ 144.99488831  145.22894287  145.57142639]
+    >>> new = pygrass.RasterSegment('new')
+    >>> new.open()
+    >>> for irow in xrange(elev.rows):
+    ...     new[irow] = elev[irow] < 144
+    ...
+    >>> for row in new[:5]: print(row[:3])
+    [1 1 1]
+    [1 1 1]
+    [1 1 1]
+    [0 0 0]
+    [0 0 0]
+
+The RasterSegment class define two methods to read and write the map:
+
+    * ``get_row`` that return the buffer object with the row that call the
+      C function ``segment_get_row``. ::
+
+        >>> # call explicity the method
+        >>> elev_row0 = elev.get_row(0)
+        >>> # call implicity the method
+        >>> elev_row0 = elev[0]
+
+    * ``get`` that return the value of the call map that call the
+      C function ``segment_get``. ::
+
+        >>> # call explicity the method
+        >>> elev_val_0_0 = elev.get(0, 0)
+        >>> # call implicity the method
+        >>> elev_val_0_0 = elev[0, 0]
+
+Similarly to write the map, with ``put_row``, to write a row and with ``put``
+to write a single value to the map. ::
+
+    >>> # compare the cell value get using the ``get`` method, and take the first
+    >>> # value of the row with the ``get_row`` method
+    >>> elev[0, 0] == elev[0][0]
+    True
+    >>> # write a new value to a cell,
+    >>> new[0, 0] = 10
+    >>> new[0, 0]
+    10
+    >>> new.close()
+    >>> new.exist()
+    True
+    >>> new.remove()
+    >>> elev.close()
+    >>> elev.remove()
+
+
+
+RasterNumpy
+-----------
+
+
