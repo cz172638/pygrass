@@ -39,13 +39,13 @@ In the next exmples we instantiate a RasterRow object. ::
 We can rename the map:   ::
 
     >>> # setting the attribute
-    >>> elev.name = 'elev'
-    >>> print(elev)
-    elev@PERMANENT
+    >>> new.name = 'new_map'
+    >>> print(new)
+    new_map
     >>> # or using the rename methods
-    >>> elev.rename('elevation')
-    >>> print(elev)
-    elevation@PERMANENT
+    >>> new.rename('new')
+    >>> print(new)
+    new
 
 
 .. _RasterRow-label:

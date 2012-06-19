@@ -42,6 +42,12 @@ RTYPE_STR = {libraster.CELL_TYPE : 'CELL',
                libraster.FCELL_TYPE: 'FCELL',
                libraster.DCELL_TYPE: 'DCELL'}
 
+def clean_map_name(name):
+    name.strip()
+    for char in ' @#^?°,;%&/':
+        name = name.replace(char, '')
+    return name
+
 
 class RasterAbstractBase(object):
     """Raster_abstract_base: The base class from which all sub-classes
@@ -99,13 +105,14 @@ class RasterAbstractBase(object):
 
     def _get_name(self):
         """Private method to return the Raster name"""
-        return self._name.strip()
+        return self._name
 
     def _set_name(self, newname):
         """Private method to change the Raster name"""
+        cleanname = clean_map_name(newname)
         if self.exist():
-            self.rename(newname)
-        self._name = newname
+            self.rename(cleanname)
+        self._name = cleanname
 
     name = property(fget = _get_name, fset = _set_name)
 
@@ -146,7 +153,7 @@ class RasterAbstractBase(object):
     range = property(fget = _get_range, fset = _set_unchangeable)
 
     def __unicode__(self):
-        return "{name}@{mapset}".format(name = self.name, mapset = self.mapset)
+        return self.name_mapset()
 
     def __str__(self):
         """Return the string of the object"""
@@ -216,6 +223,17 @@ class RasterAbstractBase(object):
         libgis.G_remove(self.mtype.lower(),
                         self.name)
 
+    def name_mapset(self, name = None, mapset = None):
+        if name == None: name = self.name
+        if mapset == None:
+            self.exist()
+            mapset = self.mapset
+
+        if mapset:
+            return "{name}@{mapset}".format(name = name, mapset = mapset)
+        else:
+            return name
+
     def rename(self, newname):
         """Rename the map"""
         if self.isopen():
@@ -223,8 +241,9 @@ class RasterAbstractBase(object):
             self.close()
         if self.exist():
             libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
-                            ctypes.c_char_p(self.name),
-                            ctypes.c_char_p(newname))
+                            ctypes.c_char_p(self.name_mapset()),
+                            ctypes.c_char_p(self.name_mapset(newname,
+                                                             self.mapset)))
         else:
             self._name = newname
 
