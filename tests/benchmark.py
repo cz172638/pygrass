@@ -6,30 +6,30 @@ Created on Sat Jun 16 20:24:56 2012
 """
 import numpy as np
 import timeit
-from grass.script.core import run_command
+import collections
+import sys, os
+
+sys.path.append(os.getcwd())
 
 import pygrass
 
 
 region = pygrass.region.Region()
 
-elev = pygrass.RasterRow('elev_bench', 'w')
-X = np.linspace(region.west, region.east, region.cols, endpoint = True)
-Y = np.linspace(region.west, region.east, region.rows, endpoint = True)
+# TODO overwrite not working
+elev = pygrass.RasterRow('elev_bench', 'w', overwrite = True)
 
-print("Generate an elevation map")
-row_buf = pygrass.Buffer(X.shape, 'DCELL')
-elev.open('w', 'DCELL')
-for y in Y:
-    print(y)
-    row_buf.data = np.sin(np.sqrt(X**2 + y**2)).data
+print("Generate an elevation map...")
+row_buf = pygrass.Buffer((region.rows,), 'DCELL')
+elev.open('w', 'DCELL', overwrite = True)
+for _ in xrange(region.rows):
+    row_buf.data = (np.random.random(region.cols,)*100).data
     elev.put_row(row_buf)
 elev.close()
+print("Done!\n")
 
+print("Compare r.mapcalc and pygrass classes")
 
-print("Compare r.mapcalc and pygrass")
-
-import collections
 
 TEST = collections.OrderedDict( [
 
@@ -63,13 +63,13 @@ elev.open()""")),
 #
 
 ('r.mapcalc if', timeit.Timer(stmt = """
-run_command('r.mapcalc', expression = 'new = if(elev_bench < 0, 1, 0)', overwrite = True)
+run_command('r.mapcalc', expression = 'new = if(elev_bench < 50, 1, 0)', overwrite = True)
 """, setup = "from grass.script.core import run_command") ),
 
 ('RasterRow if', timeit.Timer(stmt = """
 new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
 new.open(overwrite = True)
-for row in elev: new.put_row( row < 0)
+for row in elev: new.put_row( row < 50)
 new.close()
 """, setup = """import pygrass
 elev = pygrass.RasterRow('elev_bench', 'r')
@@ -78,17 +78,59 @@ elev.open()""")),
 ('RasterSeg if', timeit.Timer(stmt = """
 new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
 new.open()
-for irow, row in enumerate(elev): new.put_row(irow, row < 0)
+for irow, row in enumerate(elev): new.put_row(irow, row < 50)
 new.close()
 """, setup = """import pygrass
 elev = pygrass.RasterRow('elev_bench', 'r')
 elev.open()""")),
 
+#
+# sqrt
+#
+
+('r.mapcalc sqrt', timeit.Timer(stmt = """
+run_command('r.mapcalc', expression = 'new = sqrt(elev_bench)', overwrite = True)
+""", setup = "from grass.script.core import run_command") ),
+
+('RasterRow sqrt', timeit.Timer(stmt = """
+new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
+new.open(overwrite = True)
+for row in elev: new.put_row(np.sqrt(row))
+new.close()
+""", setup = """import pygrass
+import numpy as np
+elev = pygrass.RasterRow('elev_bench', 'r')
+elev.open()""")),
+
+('RasterSeg sqrt', timeit.Timer(stmt = """
+new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
+new.open()
+for irow, row in enumerate(elev): new.put_row(irow, np.sqrt(row))
+new.close()
+""", setup = """import pygrass
+import numpy as np
+elev = pygrass.RasterRow('elev_bench', 'r')
+elev.open()""")),
+
+
 ])
 
 def run_benchmark(tests, ntimes):
+    result = collections.OrderedDict()
     for key, val in tests.iteritems():
-        print("{0}; {1:f} sec/pass".format(key, val.timeit( number=ntimes )))
+        result[key] = {}
+        result[key]['timer'] = val
+        result[key]['exec time'] = val.timeit( number=ntimes )
+        print("{0}; {1:f} sec/pass".format(key, result[key]['exec time']))
+    return result
+
+def print_benchmark(result):
+    for key, val in result.iteritems():
+        print("{0}; {1:f} sec/pass".format(key, result[key]['exec time']))
 
 
-run_benchmark(TEST, ntimes = 10)
+result = run_benchmark(TEST, ntimes = 10)
+print
+print('=' * 50)
+print
+print_benchmark(result)
