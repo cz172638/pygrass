@@ -12,15 +12,6 @@ import ctypes
 import numpy as np
 
 
-
-class CSeg(ctypes.Structure):
-    """
-    """
-    _fields_ = [("x", ctypes.c_int),
-                ("y", ctypes.c_int)]
-
-
-
 class Segment(object):
     def __init__(self, srows = 64, scols = 64, maxmem = 100):
         self.srows = srows
