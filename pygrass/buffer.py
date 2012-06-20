@@ -13,6 +13,9 @@ libc = ctypes.cdll.LoadLibrary('libc.so.6')
 
 
 class Buffer(np.ndarray):
+    """shape, mtype='FCELL', buffer=None, offset=0,
+    strides=None, order=None
+    """
 
     def __new__(cls, shape, mtype='FCELL', buffer=None, offset=0,
                 strides=None, order=None):
