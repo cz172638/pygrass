@@ -476,7 +476,8 @@ class RasterSegment(RasterAbstractBase):
             Specify the Buffer object that will be instantiate.
         """
         if row_buffer == None: row_buffer = Buffer((self._cols), self.mtype)
-        return self.segment.get_row(row, row_buffer)
+        libseg.segment_get_row(ctypes.byref(self.segment.cseg), row_buffer.p, row)
+        return row_buffer
 
     def put_row(self, row, row_buffer):
         """Write the row using the `segment.put_row` method
@@ -489,7 +490,9 @@ class RasterSegment(RasterAbstractBase):
         row_buffer: Buffer object
             Specify the Buffer object that will be write to the map.
         """
-        return self.segment.put_row(row, row_buffer)
+        libseg.segment_put_row(ctypes.byref(self.segment.cseg),
+                               row_buffer.p, row)
+        return row_buffer
 
     def get(self, row, col):
         """Return the map value using the `segment.get` method
@@ -502,7 +505,9 @@ class RasterSegment(RasterAbstractBase):
         col: integer
             Specify the column number.
         """
-        return self.segment.get(row, col)
+        libseg.segment_get(ctypes.byref(self.segment.cseg),
+                           ctypes.byref(self.segment.val), row, col)
+        return self.val.value
 
     def put(self, row, col, val):
         """Write the value to the map using the `segment.put` method
@@ -518,7 +523,9 @@ class RasterSegment(RasterAbstractBase):
             Specify the value that will be write to the map cell.
         """
         self.segment.val.value = val
-        return self.segment.put(row, col)
+        libseg.segment_put(ctypes.byref(self.segment.cseg),
+                           ctypes.byref(self.segment.val), row, col)
+        return None
 
     def open(self, mtype = ''):
         """Open the map, if the map already exist: determine the map type
