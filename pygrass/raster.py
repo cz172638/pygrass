@@ -12,6 +12,7 @@ from grass.script import fatal, warning#, message
 import grass.lib.gis as libgis
 import grass.lib.raster as libraster
 import grass.lib.segment as libseg
+import grass.lib.rowio as librowio
 from raster_type import TYPE as RTYPE
 from raster_type import RTYPE_STR
 from region import Region
@@ -393,17 +394,11 @@ class RasterRowIO(RasterAbstractBase):
 
         not implemented yet!"""
         if row_buffer == None: row_buffer = Buffer((self._cols,), self.mtype)
-        self.rowio.get(row, row_buffer)
+        rowio_buf = librowio.Rowio_get(ctypes.byref(self.rowio.crowio), row)
+        ctypes.memmove(row_buffer.p, rowio_buf, self.rowio.row_size )
         return row_buffer
 
-    def put_row(self):
-        """Private method that return the row using:
 
-            * the read mode and
-            * `rowcache` method
-
-        not implemented yet!"""
-        pass
 
 
 
@@ -507,7 +502,7 @@ class RasterSegment(RasterAbstractBase):
         """
         libseg.segment_get(ctypes.byref(self.segment.cseg),
                            ctypes.byref(self.segment.val), row, col)
-        return self.val.value
+        return self.segment.val.value
 
     def put(self, row, col, val):
         """Write the value to the map using the `segment.put` method
