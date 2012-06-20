@@ -111,9 +111,24 @@ time you are writing a new map, the row is add to the file as the last row.
 RasterRowIO
 -----------
 
+The RasterRowIO class use the grass
+`RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_,
+and implement a row cache.
+
+
+    >>> pygrass = reload(pygrass)
+    >>> elev = pygrass.RasterRowIO('elevation')
+    >>> elev.open()
+    >>> for row in elev[:5]: print(row[:3])
+    [ 141.99613953  141.27848816  141.37904358]
+    [ 142.90461731  142.39450073  142.68611145]
+    [ 143.81854248  143.54707336  143.83972168]
+    [ 144.56524658  144.58493042  144.86477661]
+    [ 144.99488831  145.22894287  145.57142639]
+
+
 
 .. _RasterSegment-label:
-
 
 RastSegment
 -----------

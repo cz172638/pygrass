@@ -13,10 +13,12 @@ import grass.lib.gis as libgis
 import grass.lib.raster as libraster
 import grass.lib.segment as libseg
 from raster_type import TYPE as RTYPE
+from raster_type import RTYPE_STR
 from region import Region
 from buffer import Buffer
 from segment import Segment
-import numpy as np
+from rowio import RowIO
+#import numpy as np
 
 #import grass.script as grass
 #import grass.temporal as tgis
@@ -37,10 +39,6 @@ MTHD_NOT_SUP = '{0} Method not valid, use: {1}'
 MODE_NOT_SUP = '{0} Mode not valid, use: {1}'
 
 
-## Private dictionary to convert RASTER_TYPE into type string.
-RTYPE_STR = {libraster.CELL_TYPE : 'CELL',
-               libraster.FCELL_TYPE: 'FCELL',
-               libraster.DCELL_TYPE: 'DCELL'}
 
 def clean_map_name(name):
     name.strip()
@@ -241,9 +239,8 @@ class RasterAbstractBase(object):
             self.close()
         if self.exist():
             libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
-                            ctypes.c_char_p(self.name_mapset()),
-                            ctypes.c_char_p(self.name_mapset(newname,
-                                                             self.mapset)))
+                            ctypes.c_char_p(self.name),
+                            ctypes.c_char_p(newname))
         else:
             self._name = newname
 
@@ -303,7 +300,7 @@ class RasterRow(RasterAbstractBase):
         return None
 
 
-    def open(self, mode = '', mtype = '', overwrite = False):
+    def open(self, mode = '', mtype = '', overwrite = ''):
         """Open the raster if exist or created a new one.
 
         Parameters
@@ -362,14 +359,42 @@ class RasterRowIO(RasterAbstractBase):
     """Raster_row_cache_access": The same as "Raster_row_access" but uses
     the ROWIO library for cached row access
     """
-    def get_row(self):
+    def __init__(self, name, *args, **kargs):
+        self.rowio = RowIO()
+        super(RasterRowIO, self).__init__(name, *args, **kargs)
+
+    def open(self):
+        # read rows and cols from the active region
+        self._rows = libraster.Rast_window_rows()
+        self._cols = libraster.Rast_window_cols()
+        # open the map
+        self._fd = libraster.Rast_open_old( self.name, self.mapset )
+        self._gtype = libraster.Rast_get_map_type ( self._fd )
+        self.mtype = RTYPE_STR[self._gtype]
+        self.rowio.open(self._fd, self.rows, self.cols, self.mtype)
+
+    def close(self):
+        if self.isopen():
+            #self.rowio.flush()
+            self.rowio.release()
+            libraster.Rast_close(self._fd)
+            # update rows and cols attributes
+            self._rows = None
+            self._cols = None
+            self._fd = None
+        else:
+            warning(_("The map is already close!"))
+
+    def get_row(self, row, row_buffer = None):
         """Private method that return the row using:
 
             * the read mode and
             * `rowcache` method
 
         not implemented yet!"""
-        pass
+        if row_buffer == None: row_buffer = Buffer((self._cols,), self.mtype)
+        self.rowio.get(row, row_buffer)
+        return row_buffer
 
     def put_row(self):
         """Private method that return the row using:

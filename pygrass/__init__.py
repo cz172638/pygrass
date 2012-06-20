@@ -7,5 +7,6 @@ Created on Fri May 25 12:55:14 2012
 
 from buffer import Buffer
 from segment import Segment
-from raster import RasterRow, RasterSegment
+from rowio import RowIO
+from raster import RasterRow, RasterSegment, RasterRowIO
 from region import Region

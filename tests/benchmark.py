@@ -16,12 +16,12 @@ import pygrass
 
 region = pygrass.region.Region()
 
-# TODO overwrite not working
+
 elev = pygrass.RasterRow('elev_bench', 'w', overwrite = True)
 
 print("Generate an elevation map...")
 row_buf = pygrass.Buffer((region.rows,), 'DCELL')
-elev.open('w', 'DCELL', overwrite = True)
+elev.open('w', 'DCELL')
 for _ in xrange(region.rows):
     row_buf.data = (np.random.random(region.cols,)*100).data
     elev.put_row(row_buf)
