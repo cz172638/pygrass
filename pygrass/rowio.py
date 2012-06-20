@@ -38,20 +38,20 @@ elev.mtype = RTYPE_STR[elev._gtype]
 elev.rowio.open(elev._fd, elev.rows, elev.cols, elev.mtype)
 elev.open()
 """
-
-CMPFUNC = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p,
-                           ctypes.c_int, ctypes.c_int)
+CMPFUNC = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int)
+#CMPFUNC = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p,
+#                           ctypes.c_int, ctypes.c_int)
 
 def getmaprow_CELL(fd, buf, row, l):
-    librast.Rast_get_f_row( fd, ctypes.cast(buf, librast.FCELL), row)
+    librast.Rast_get_f_row( fd, ctypes.cast(buf, ctypes.POINTER(librast.CELL)), row)
     return 0
 
 def getmaprow_FCELL(fd, buf, row, l):
-    librast.Rast_get_f_row( fd, ctypes.cast(buf, librast.FCELL), row)
+    librast.Rast_get_f_row( fd, ctypes.cast(buf, ctypes.POINTER(librast.FCELL)), row)
     return 0
 
 def getmaprow_DCELL(fd, buf, row, l):
-    librast.Rast_get_f_row( fd, ctypes.cast(buf, librast.FCELL), row)
+    librast.Rast_get_f_row( fd, ctypes.cast(buf, ctypes.POINTER(librast.DCELL)), row)
     return 0
 
 get_row = {
@@ -95,7 +95,7 @@ class RowIO(object):
                              self.rows,
                              ctypes.sizeof(RTYPE[mtype]['grass def'] * cols),
                              get_row[self.mtype],
-                             None)
+                             get_row[self.mtype])
 
     def release(self):
         librowio.release(ctypes.byref(self.crowio))
@@ -108,3 +108,4 @@ class RowIO(object):
     def get(self, row_index, buf):
         self.crowio.buf = ctypes.cast(buf.p, ctypes.c_void_p)
         librowio.Rowio_get(ctypes.byref(self.crowio), row_index)
+
