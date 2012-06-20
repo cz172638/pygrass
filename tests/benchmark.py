@@ -31,6 +31,14 @@ print("Done!\n")
 print("Compare r.mapcalc and pygrass classes")
 
 
+rmapcalc_SETUP = "from grass.script.core import run_command"
+
+pygrass_SETUP = """import pygrass
+import numpy as np
+elev = pygrass.RasterRow('elev_bench', 'r')
+elev.open()"""
+
+
 TEST = collections.OrderedDict( [
 
 #
@@ -38,25 +46,21 @@ TEST = collections.OrderedDict( [
 #
 ('r.mapcalc +2', timeit.Timer(stmt = """
 run_command('r.mapcalc', expression = 'new = elev_bench + 2', overwrite = True)
-""", setup = "from grass.script.core import run_command") ),
+""", setup = rmapcalc_SETUP) ),
 
 ('RasterRow +2', timeit.Timer(stmt = """
 new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
 new.open(overwrite = True)
 for row in elev: new.put_row( row + 2)
 new.close()
-""", setup = """import pygrass
-elev = pygrass.RasterRow('elev_bench', 'r')
-elev.open()""")),
+""", setup = pygrass_SETUP)),
 
 ('RasterSeg +2', timeit.Timer(stmt = """
 new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
 new.open()
 for irow, row in enumerate(elev): new.put_row(irow, row + 2)
 new.close()
-""", setup = """import pygrass
-elev = pygrass.RasterRow('elev_bench', 'r')
-elev.open()""")),
+""", setup = pygrass_SETUP)),
 
 #
 # 1 if map < 0 else 0
@@ -64,25 +68,21 @@ elev.open()""")),
 
 ('r.mapcalc if', timeit.Timer(stmt = """
 run_command('r.mapcalc', expression = 'new = if(elev_bench < 50, 1, 0)', overwrite = True)
-""", setup = "from grass.script.core import run_command") ),
+""", setup = rmapcalc_SETUP) ),
 
 ('RasterRow if', timeit.Timer(stmt = """
 new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
 new.open(overwrite = True)
 for row in elev: new.put_row( row < 50)
 new.close()
-""", setup = """import pygrass
-elev = pygrass.RasterRow('elev_bench', 'r')
-elev.open()""")),
+""", setup = pygrass_SETUP")),
 
 ('RasterSeg if', timeit.Timer(stmt = """
 new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
 new.open()
 for irow, row in enumerate(elev): new.put_row(irow, row < 50)
 new.close()
-""", setup = """import pygrass
-elev = pygrass.RasterRow('elev_bench', 'r')
-elev.open()""")),
+""", setup = pygrass_SETUP)),
 
 #
 # sqrt
@@ -90,27 +90,21 @@ elev.open()""")),
 
 ('r.mapcalc sqrt', timeit.Timer(stmt = """
 run_command('r.mapcalc', expression = 'new = sqrt(elev_bench)', overwrite = True)
-""", setup = "from grass.script.core import run_command") ),
+""", setup = rmapcalc_SETUP) ),
 
 ('RasterRow sqrt', timeit.Timer(stmt = """
 new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
 new.open(overwrite = True)
 for row in elev: new.put_row(np.sqrt(row))
 new.close()
-""", setup = """import pygrass
-import numpy as np
-elev = pygrass.RasterRow('elev_bench', 'r')
-elev.open()""")),
+""", setup = pygrass_SETUP)),
 
 ('RasterSeg sqrt', timeit.Timer(stmt = """
 new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
 new.open()
 for irow, row in enumerate(elev): new.put_row(irow, np.sqrt(row))
 new.close()
-""", setup = """import pygrass
-import numpy as np
-elev = pygrass.RasterRow('elev_bench', 'r')
-elev.open()""")),
+""", setup = pygrass_SETUP)),
 
 
 ])
