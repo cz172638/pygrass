@@ -15,6 +15,16 @@ that allow users to read and write the
 map at the same time (:ref:`RasterSegment-label` class), and using the numpy interface
 to the map (:ref:`RasterNumpy-label` class).
 
+
+==========================  ==============================================================================  ============  =======================================
+Class Name                  C library                                                                       Mode          Note
+==========================  ==============================================================================  ============  =======================================
+:ref:`RasterRow-label`      `Raster library <http://grass.osgeo.org/programming7/rasterlib.html>`_          Read & Write  Write only sequentially
+:ref:`RasterRowIO-label`    `RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_            Read          Implement a Row cache in memory
+:ref:`RasterSegment-label`  `Segmentation library <http://grass.osgeo.org/programming7/segmentlib.html>`_   Read & Write  Read and Write randomly on the same map
+:ref:`RasterNumpy-label`                                                                                    Read & Write
+==========================  ==============================================================================  ============  =======================================
+
 All these classes share common methods and attributes, necessary to address
 common tasks as rename, remove, open, close, exist, isopen.
 In the next exmples we instantiate a RasterRow object. ::
@@ -57,7 +67,7 @@ The RasterRow class use the Grass C API to read and write the map, there is not
 support to read and write to the same map at the same time, for this
 functionality, please see the RasterSegment class.
 The RasterRow class allow to read in a randomly order the row from a map, but
-it is only possible to write the map using a sequence order, therefore every
+it is only possible to write the map using only a sequence order, therefore every
 time you are writing a new map, the row is add to the file as the last row.
 
 ::
@@ -114,6 +124,11 @@ RasterRowIO
 The RasterRowIO class use the grass
 `RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_,
 and implement a row cache.
+The RasterRowIO class support only reading the raster, because the
+raster rows can only be written in sequential order,
+writing by row id is not supported by design. Hence, we should use the
+rowio lib only for caching rows for reading and use the default row
+write access as in the RasterRow class.
 
 
     >>> pygrass = reload(pygrass)
