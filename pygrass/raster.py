@@ -7,6 +7,7 @@ Created on Fri May 25 12:56:33 2012
 
 import ctypes
 from grass.script import fatal, warning#, message
+from grass.script import core as grasscore
 #from grass.script import core
 #import grass.lib as grasslib
 import grass.lib.gis as libgis
@@ -19,7 +20,7 @@ from region import Region
 from buffer import Buffer
 from segment import Segment
 from rowio import RowIO
-#import numpy as np
+import numpy as np
 
 #import grass.script as grass
 #import grass.temporal as tgis
@@ -95,8 +96,8 @@ class RasterAbstractBase(object):
 
     def _set_mtype(self, mtype):
         if mtype.upper() not in ('CELL', 'FCELL', 'DCELL'):
-            fatal(_("Raser type: {0} not supported".format(mtype) ) )
-            raise
+            #fatal(_("Raser type: {0} not supported".format(mtype) ) )
+            raise ValueError(_("Raser type: {0} not supported".format(mtype) ))
         self._mtype = mtype
         self._gtype = RTYPE[self.mtype]['grass type']
 
@@ -578,10 +579,13 @@ class RasterSegment(RasterAbstractBase):
 
 
 
+FLAGS = {1 : {'b' : 'i', 'i' : 'i',  'u':'i'},
+         2 : {'b' : 'i', 'i' : 'i',  'u':'i'},
+         4 : {'f' : 'f', 'i' : 'i'},
+         8 : {'f' : 'd'},}
 
 
-
-class RasterNumpy(RasterAbstractBase):
+class RasterNumpy(np.memmap, RasterAbstractBase):
     """Raster_cached_narray": Inherits "Raster_abstract_base" and
     "numpy.memmap". Its purpose is to allow numpy narray like access to
     raster maps without loading the map into the main memory.
@@ -589,21 +593,137 @@ class RasterNumpy(RasterAbstractBase):
       operations: __add__, ...
     * Overrides the open and close methods
     * Be aware of the 2Gig file size limit
+
+    >>> import pygrass
+    >>> elev = pygrass.RasterNumpy('elevation')
+    >>> elev.open()
+    >>> elev[:5, :3]
+
     """
+    def __new__(cls, name,  mapset = "", mtype='FCELL', mode = 'r+',
+                overwrite = False):
+        reg = Region()
+        shape = (reg.rows, reg.cols)
+        mapset = libgis.G_find_raster(name, mapset)
+        if mapset:
+            # map exist, set the map type
+            fd = libraster.Rast_open_old( name, mapset )
+            gtype = libraster.Rast_get_map_type ( fd )
+            mtype = RTYPE_STR[ gtype ]
+            libraster.Rast_close( fd )
+        filename = grasscore.tempfile()
+        obj = np.memmap.__new__(cls, filename = filename,
+                                dtype = RTYPE[mtype]['numpy'],
+                                mode = mode,
+                                shape = shape)
+        obj.mtype = mtype.upper()
+        obj._rows = reg.rows
+        obj._cols = reg.cols
+        obj.filename = filename
+        obj._name = name
+        obj.mapset = mapset
+        obj.reg = reg
+        obj.overwrite = overwrite
+        return obj
 
-    def get_row(self):
-        """Private method that return the row using:
-           the `array` method
+#    def __array_finalize__(self, obj):
+#        if obj is None: return
+#        self._rows = getattr(obj, '_rows', None)
+#        self._cols = getattr(obj, '_cols', None)
+#        self.filename = getattr(obj, 'filename', None)
+#        self._name = getattr(obj, '_name', None)
+#
+#    def __array_wrap__(self, out_arr, context=None):
+#        """See:
+#        http://docs.scipy.org/doc/numpy/user/basics.subclassing.html#array-wrap-for-ufuncs"""
+#        if out_arr.dtype == np.bool:
+#            # there is not support for boolean maps, so convert into integer
+#            out_arr = out_arr.astype(np.int32)
+#        out_arr.p = out_arr.ctypes.data_as(out_arr.pointer_type)
+#        return np.ndarray.__array_wrap__(self, out_arr, context)
 
-        not implemented yet!"""
+    def __init__(self, name, *args, **kargs):
+        ## Private attribute `_fd` that return the file descriptor of the map
+        self._fd = None
+
+    def get_flags(self):
+        kind = self.dtype.kind
+        size = self.dtype.itemsize
+        if FLAGS.has_key(size):
+            if FLAGS[size].has_key(kind):
+                return FLAGS[size][kind]
+            else:
+                raise ValueError(_('Invalid type {0}'.forma(kind)))
+        else:
+            raise ValueError(_('Invalid size {0}'.format(size)))
+
+    def open(self, mtype = '', null = None):
+        """Open the map, if the map already exist: determine the map type
+        and copy the map to the segment files;
+        else, open a new segment map.
+
+        Parameters
+        ------------
+
+        mtype: string, optional
+            Specify the map type, valid only for new maps: CELL, FCELL, DCELL;
+        """
+        # rows and cols already set in __new__
+        if self.exist():
+            self._read(null = null)
+        else:
+            if mtype: self.mtype = mtype
+            self._gtype = RTYPE[self.mtype]['grass type']
+        # set _fd, because this attribute is used to check
+        # if the map is open or not
+        self._fd = 1
+
+    def close(self):
+        self._write()
+        np.memmap._close(self)
+        grasscore.try_remove(self.filename)
+        self._fd = None
+
+    def remove(self):
         pass
 
-    def put_row(self):
-        """Private method that write the row using:
-           the `array` method
+    def _read(self, mapname = None, null = None):
+        """!Read raster map into array
 
-        not implemented yet!"""
-        pass
+        @param mapname name of raster map to be read
+        @param null null value
+
+        @return 0 on success
+        @return non-zero code on failure
+        """
+        if mapname == None: mapname = self.name
+        flags = self.get_flags()
+        flags = 'f' if flags == 'd' else flags
+        return grasscore.run_command('r.out.bin', flags = flags,
+                                     input = mapname, output = self.filename,
+                                     bytes = self.dtype.itemsize, null = null,
+                                     quiet = True)
+
+    def _write(self, mapname = None, title = None, null = None,
+              overwrite = None):
+        """
+        """
+        if mapname == None: mapname = self.name
+        flags = self.get_flags()
+        return grasscore.run_command('r.in.bin', flags = flags,
+                                     input = self.filename, output = mapname,
+                                     title = title, bytes = self.dtype.itemsize,
+                                     anull = null, overwrite = overwrite,
+                                     verbose = True,
+                                     north = self.reg.north,
+                                     south = self.reg.south,
+                                     east  = self.reg.east,
+                                     west  = self.reg.west,
+                                     rows  = self.reg.rows,
+                                     cols  = self.reg.cols)
+
+
+
 
 
 if __name__ == "__main__":
