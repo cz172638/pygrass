@@ -240,9 +240,13 @@ to load all the map in memory.
        [ True,  True,  True],
        [False, False, False],
        [False, False, False]], dtype=bool)
-    >>> el._name = 'new'
+    >>> el.name == None
+    True
+    >>> # give a name to the new map
+    >>> el.name = 'new'
     >>> el.close()
-    >>> el._write('new', overwrite = True)
+    >>> el.remove()
+
 
 
 
