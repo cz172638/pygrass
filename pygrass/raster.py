@@ -109,6 +109,7 @@ class RasterAbstractBase(object):
 
     def _set_name(self, newname):
         """Private method to change the Raster name"""
+        #import pdb; pdb.set_trace()
         cleanname = clean_map_name(newname)
         if self.exist():
             self.rename(cleanname)
@@ -194,7 +195,10 @@ class RasterAbstractBase(object):
         set the mapset if were not set.
 
         call the C function `G_find_raster`."""
-        self.mapset = libgis.G_find_raster(self.name, self.mapset)
+        if self.name:
+            self.mapset = libgis.G_find_raster(self.name, self.mapset)
+        else:
+            return False
         if self.mapset:
             return True
         else:
@@ -243,8 +247,7 @@ class RasterAbstractBase(object):
             libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
                             ctypes.c_char_p(self.name),
                             ctypes.c_char_p(newname))
-        else:
-            self._name = newname
+        self._name = newname
 
 
     def set_from_rast(self, rastname='', mapset=''):
@@ -581,7 +584,7 @@ class RasterSegment(RasterAbstractBase):
 
 FLAGS = {1 : {'b' : 'i', 'i' : 'i',  'u':'i'},
          2 : {'b' : 'i', 'i' : 'i',  'u':'i'},
-         4 : {'f' : 'f', 'i' : 'i'},
+         4 : {'f' : 'f', 'i' : 'i',  'b':'i', 'u':'i'},
          8 : {'f' : 'd'},}
 
 
@@ -598,6 +601,19 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
     >>> elev = pygrass.RasterNumpy('elevation')
     >>> elev.open()
     >>> elev[:5, :3]
+    RasterNumpy([[ 141.99613953,  141.27848816,  141.37904358],
+       [ 142.90461731,  142.39450073,  142.68611145],
+       [ 143.81854248,  143.54707336,  143.83972168],
+       [ 144.56524658,  144.58493042,  144.86477661],
+       [ 144.99488831,  145.22894287,  145.57142639]], dtype=float32)
+    >>> el = elev < 144
+    >>> el[:5, :3]
+    RasterNumpy([[ True,  True,  True],
+       [ True,  True,  True],
+       [ True,  True,  True],
+       [False, False, False],
+       [False, False, False]], dtype=bool)
+    >>> el._write('new', overwrite = True)
 
     """
     def __new__(cls, name,  mapset = "", mtype='FCELL', mode = 'r+',
@@ -626,36 +642,89 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         obj.overwrite = overwrite
         return obj
 
-#    def __array_finalize__(self, obj):
-#        if obj is None: return
-#        self._rows = getattr(obj, '_rows', None)
-#        self._cols = getattr(obj, '_cols', None)
-#        self.filename = getattr(obj, 'filename', None)
-#        self._name = getattr(obj, '_name', None)
-#
-#    def __array_wrap__(self, out_arr, context=None):
-#        """See:
-#        http://docs.scipy.org/doc/numpy/user/basics.subclassing.html#array-wrap-for-ufuncs"""
-#        if out_arr.dtype == np.bool:
-#            # there is not support for boolean maps, so convert into integer
-#            out_arr = out_arr.astype(np.int32)
-#        out_arr.p = out_arr.ctypes.data_as(out_arr.pointer_type)
-#        return np.ndarray.__array_wrap__(self, out_arr, context)
+    def __array_finalize__(self, obj):
+        if hasattr(obj, '_mmap'):
+            self._mmap = obj._mmap
+            self.filename = obj.filename
+            self.offset = obj.offset
+            self.mode = obj.mode
+            self._rows = obj._rows
+            self._cols = obj._cols
+            self._name = None
+            self.mapset = None
+            self.reg = obj.reg
+            self.overwrite = obj.overwrite
+            self.mtype = obj.mtype
+            self._fd = obj._fd
+        else:
+            self._mmap = None
+
+    def __array_wrap__(self, out_arr, context=None):
+        """See:
+        http://docs.scipy.org/doc/numpy/user/basics.subclassing.html#array-wrap-for-ufuncs"""
+        #import pdb; pdb.set_trace()
+        if out_arr.dtype.kind in 'bui':
+            # there is not support for boolean maps, so convert into integer
+            out_arr = out_arr.astype(np.int32)
+        #out_arr.p = out_arr.ctypes.data_as(out_arr.pointer_type)
+        return np.ndarray.__array_wrap__(self, out_arr, context)
 
     def __init__(self, name, *args, **kargs):
         ## Private attribute `_fd` that return the file descriptor of the map
         self._fd = None
 
-    def get_flags(self):
-        kind = self.dtype.kind
-        size = self.dtype.itemsize
+    def _get_flags(self, size, kind):
         if FLAGS.has_key(size):
             if FLAGS[size].has_key(kind):
-                return FLAGS[size][kind]
+                return size, FLAGS[size][kind]
             else:
                 raise ValueError(_('Invalid type {0}'.forma(kind)))
         else:
             raise ValueError(_('Invalid size {0}'.format(size)))
+
+    def _read(self, mapname = None, null = None):
+        """!Read raster map into array
+
+        @param mapname name of raster map to be read
+        @param null null value
+
+        @return 0 on success
+        @return non-zero code on failure
+        """
+        size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
+        kind = 'f' if kind == 'd' else kind
+        if mapname == None: mapname = self.name
+        return grasscore.run_command('r.out.bin', flags = kind,
+                                     input = mapname, output = self.filename,
+                                     bytes = size, null = null,
+                                     quiet = True)
+
+    def _write(self, mapname = None, title = None, null = None,
+              overwrite = None):
+        """
+        r.in.bin input=/home/pietro/docdat/phd/thesis/gis/north_carolina/user1/.tmp/eraclito/14325.0 output=new title='' bytes=1,anull='' --verbose --overwrite north=228500.0 south=215000.0 east=645000.0 west=630000.0 rows=1350 cols=1500
+
+        """
+        size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
+        #print size, kind
+        if kind == 'i':
+            kind = None
+            size = 4
+        else: kind
+        size = None if kind == 'f' else size
+        if mapname == None: mapname = self.name
+        #print size, kind
+        return grasscore.run_command('r.in.bin', flags = kind,
+                                     input = self.filename, output = mapname,
+                                     title = title, bytes = size,
+                                     anull = null, overwrite = overwrite,
+                                     verbose = True,
+                                     north = self.reg.north,
+                                     south = self.reg.south,
+                                     east  = self.reg.east,
+                                     west  = self.reg.west,
+                                     rows  = self.reg.rows,
+                                     cols  = self.reg.cols)
 
     def open(self, mtype = '', null = None):
         """Open the map, if the map already exist: determine the map type
@@ -684,43 +753,16 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         grasscore.try_remove(self.filename)
         self._fd = None
 
-    def remove(self):
-        pass
+#    def rename(self, newname):
+#        """Rename the map"""
+#        #import pdb; pdb.set_trace()
+#        newname = clean_map_name(newname)
+#        if self._name:
+#            libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
+#                            ctypes.c_char_p(self._name),
+#                            ctypes.c_char_p(newname))
+#        self._name = newname
 
-    def _read(self, mapname = None, null = None):
-        """!Read raster map into array
-
-        @param mapname name of raster map to be read
-        @param null null value
-
-        @return 0 on success
-        @return non-zero code on failure
-        """
-        if mapname == None: mapname = self.name
-        flags = self.get_flags()
-        flags = 'f' if flags == 'd' else flags
-        return grasscore.run_command('r.out.bin', flags = flags,
-                                     input = mapname, output = self.filename,
-                                     bytes = self.dtype.itemsize, null = null,
-                                     quiet = True)
-
-    def _write(self, mapname = None, title = None, null = None,
-              overwrite = None):
-        """
-        """
-        if mapname == None: mapname = self.name
-        flags = self.get_flags()
-        return grasscore.run_command('r.in.bin', flags = flags,
-                                     input = self.filename, output = mapname,
-                                     title = title, bytes = self.dtype.itemsize,
-                                     anull = null, overwrite = overwrite,
-                                     verbose = True,
-                                     north = self.reg.north,
-                                     south = self.reg.south,
-                                     east  = self.reg.east,
-                                     west  = self.reg.west,
-                                     rows  = self.reg.rows,
-                                     cols  = self.reg.cols)
 
 
 

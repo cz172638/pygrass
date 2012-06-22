@@ -6,24 +6,21 @@ Raster
 PyGrass use 4 different Raster classes, that respect the 4 different approaches
 of C grass API. PyGrass Allow user to open the maps, in read and write mode,
 row by row (:ref:`RasterRow-label` class) using the
-`Raster library <http://grass.osgeo.org/programming7/rasterlib.html>`_,
-using the
-`RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_
-(:ref:`RasterRowIO-label` class), using the
-`Segmentation library <http://grass.osgeo.org/programming7/segmentlib.html>`_
-that allow users to read and write the
-map at the same time (:ref:`RasterSegment-label` class), and using the numpy interface
-to the map (:ref:`RasterNumpy-label` class).
+`Raster library`_, using the `RowIO library`_ (:ref:`RasterRowIO-label` class),
+using the `Segmentation library`_ that allow users to read and write the map
+at the same time (:ref:`RasterSegment-label` class), and using the numpy
+interface to the map (:ref:`RasterNumpy-label` class).
 
 
-==========================  ==============================================================================  ============  =======================================
-Class Name                  C library                                                                       Mode          Note
-==========================  ==============================================================================  ============  =======================================
-:ref:`RasterRow-label`      `Raster library <http://grass.osgeo.org/programming7/rasterlib.html>`_          Read & Write  Write only sequentially
-:ref:`RasterRowIO-label`    `RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_            Read          Implement a Row cache in memory
-:ref:`RasterSegment-label`  `Segmentation library <http://grass.osgeo.org/programming7/segmentlib.html>`_   Read & Write  Read and Write randomly on the same map
-:ref:`RasterNumpy-label`                                                                                    Read & Write
-==========================  ==============================================================================  ============  =======================================
+==========================  =======================  ========  ============
+Class Name                  C library                Read      Write
+==========================  =======================  ========  ============
+:ref:`RasterRow-label`      `Raster library`_        randomly  sequentially
+:ref:`RasterRowIO-label`    `RowIO library`_         cached    no
+:ref:`RasterSegment-label`  `Segmentation library`_  cached    randomly
+:ref:`RasterNumpy-label`    `numpy.memmap`_          cached    randomly
+==========================  =======================  ========  ============
+
 
 All these classes share common methods and attributes, necessary to address
 common tasks as rename, remove, open, close, exist, isopen.
@@ -121,14 +118,11 @@ time you are writing a new map, the row is add to the file as the last row.
 RasterRowIO
 -----------
 
-The RasterRowIO class use the grass
-`RowIO library <http://grass.osgeo.org/programming7/rowiolib.html>`_,
-and implement a row cache.
-The RasterRowIO class support only reading the raster, because the
-raster rows can only be written in sequential order,
-writing by row id is not supported by design. Hence, we should use the
-rowio lib only for caching rows for reading and use the default row
-write access as in the RasterRow class.
+The RasterRowIO class use the grass `RowIO library`_, and implement a row
+cache. The RasterRowIO class support only reading the raster, because the
+raster rows can only be written in sequential order, writing by row id is not
+supported by design. Hence, we should use the rowio lib only for caching rows
+for reading and use the default row write access as in the RasterRow class.
 
 
     >>> pygrass = reload(pygrass)
@@ -218,4 +212,41 @@ to write a single value to the map. ::
 RasterNumpy
 -----------
 
+The RasterNumpy class, is based on the `numpy.memmap`_ class If you open an
+existing map, the map will be copied on a binary format, and read to avoid
+to load all the map in memory.
 
+    >>> import pygrass
+    >>> elev = pygrass.RasterNumpy('elevation')
+    >>> elev.open()
+    >>> for row in elev[:5]: print(row[:3])
+    [ 141.99613953  141.27848816  141.37904358]
+    [ 142.90461731  142.39450073  142.68611145]
+    [ 143.81854248  143.54707336  143.83972168]
+    [ 144.56524658  144.58493042  144.86477661]
+    [ 144.99488831  145.22894287  145.57142639]
+    >>> # in this case RasterNumpy is an extention of the numpy class
+    >>> # therefore you may use all the fancy things of numpy.
+    >>> elev[:5, :3]
+    RasterNumpy([[ 141.99613953,  141.27848816,  141.37904358],
+       [ 142.90461731,  142.39450073,  142.68611145],
+       [ 143.81854248,  143.54707336,  143.83972168],
+       [ 144.56524658,  144.58493042,  144.86477661],
+       [ 144.99488831,  145.22894287,  145.57142639]], dtype=float32)
+    >>> el = elev < 144
+    >>> el[:5, :3]
+    RasterNumpy([[ True,  True,  True],
+       [ True,  True,  True],
+       [ True,  True,  True],
+       [False, False, False],
+       [False, False, False]], dtype=bool)
+    >>> el._name = 'new'
+    >>> el.close()
+    >>> el._write('new', overwrite = True)
+
+
+
+.. _Raster library: http://grass.osgeo.org/programming7/rasterlib.html/
+.. _RowIO library: http://grass.osgeo.org/programming7/rowiolib.html
+.. _Segmentation library: http://grass.osgeo.org/programming7/segmentlib.html
+.. _numpy.memmap: http://docs.scipy.org/doc/numpy/reference/generated/numpy.memmap.html
