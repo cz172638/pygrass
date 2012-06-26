@@ -17,13 +17,16 @@ import pygrass
 region = pygrass.region.Region()
 
 
-elev = pygrass.RasterRow('elev_bench', 'w', overwrite = True)
+elev = pygrass.RasterRow('elev_bench')
 
 print("Generate an elevation map...")
-row_buf = pygrass.Buffer((region.rows,), 'DCELL')
-elev.open('w', 'DCELL')
+row_buf = pygrass.Buffer((region.cols, ), 'DCELL',
+                         buffer = (np.random.random(region.cols,)*100).data )
+elev.open(mode = 'w', mtype = 'DCELL',  overwrite = True)
 for _ in xrange(region.rows):
-    row_buf.data = (np.random.random(region.cols,)*100).data
+    # uncomment to get random rows
+    #row_buf = pygrass.Buffer((region.cols, ), 'DCELL',
+    #                     buffer = (np.random.random(region.cols,)*100).data )
     elev.put_row(row_buf)
 elev.close()
 print("Done!\n")
@@ -36,6 +39,11 @@ rmapcalc_SETUP = "from grass.script.core import run_command"
 pygrass_SETUP = """import pygrass
 import numpy as np
 elev = pygrass.RasterRow('elev_bench', 'r')
+elev.open()"""
+
+pygrass_numpy_SETUP = """import pygrass
+import numpy as np
+elev = pygrass.RasterNumpy('elev_bench', overwrite = True)
 elev.open()"""
 
 
@@ -62,6 +70,13 @@ for irow, row in enumerate(elev): new.put_row(irow, row + 2)
 new.close()
 """, setup = pygrass_SETUP)),
 
+('RasterNumpy +2', timeit.Timer(stmt = """
+el = elev + 2
+el.overwrite=True
+el.rename('new')
+el.close()
+""", setup = pygrass_numpy_SETUP)),
+
 #
 # 1 if map < 0 else 0
 #
@@ -75,7 +90,7 @@ new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
 new.open(overwrite = True)
 for row in elev: new.put_row( row < 50)
 new.close()
-""", setup = pygrass_SETUP")),
+""", setup = pygrass_SETUP)),
 
 ('RasterSeg if', timeit.Timer(stmt = """
 new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
@@ -83,6 +98,12 @@ new.open()
 for irow, row in enumerate(elev): new.put_row(irow, row < 50)
 new.close()
 """, setup = pygrass_SETUP)),
+
+('RasterNumpy if', timeit.Timer(stmt = """
+el = elev < 50
+el.overwrite=True
+el.rename("newif")
+el.close()""", setup = pygrass_numpy_SETUP)),
 
 #
 # sqrt
@@ -106,6 +127,12 @@ for irow, row in enumerate(elev): new.put_row(irow, np.sqrt(row))
 new.close()
 """, setup = pygrass_SETUP)),
 
+('RasterNumpy sqrt', timeit.Timer(stmt = """
+el = np.sqrt(elev)
+el.overwrite=True
+el.rename('new')
+el.close()
+""", setup = pygrass_numpy_SETUP)),
 
 ])
 

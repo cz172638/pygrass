@@ -187,9 +187,6 @@ class RasterAbstractBase(object):
         """Return a constructor of the class"""
         return ( self.__getitem__(irow) for irow in xrange(self._rows) )
 
-    def __del__(self):
-        self.remove()
-
 
     def exist(self):
         """Return True if the map already exist, and
@@ -197,7 +194,7 @@ class RasterAbstractBase(object):
 
         call the C function `G_find_raster`."""
         if self.name:
-            self.mapset = libgis.G_find_raster(self.name, self.mapset)
+            self.mapset = env.get_mapset(self.name, self.mapset)
         else:
             return False
         if self.mapset:
@@ -241,9 +238,6 @@ class RasterAbstractBase(object):
 
     def rename(self, newname):
         """Rename the map"""
-        if self.isopen():
-            warning(_("The map is open, closing the map"))
-            self.close()
         if self.exist():
             env.rename(self.name, newname, 'rast')
         self._name = newname
@@ -646,7 +640,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
     def __array_finalize__(self, obj):
         if hasattr(obj, '_mmap'):
             self._mmap = obj._mmap
-            self.filename = obj.filename
+            self.filename = grasscore.tempfile()
             self.offset = obj.offset
             self.mode = obj.mode
             self._rows = obj._rows
@@ -663,7 +657,6 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
     def __array_wrap__(self, out_arr, context=None):
         """See:
         http://docs.scipy.org/doc/numpy/user/basics.subclassing.html#array-wrap-for-ufuncs"""
-        #import pdb; pdb.set_trace()
         if out_arr.dtype.kind in 'bui':
             # there is not support for boolean maps, so convert into integer
             out_arr = out_arr.astype(np.int32)
@@ -719,7 +712,6 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         else: kind
         size = None if kind == 'f' else size
 
-        #print size, kind
         return grasscore.run_command('r.in.bin', flags = kind,
                                      input = self.filename, output = mapname,
                                      title = title, bytes = size,
@@ -758,17 +750,6 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         np.memmap._close(self)
         grasscore.try_remove(self.filename)
         self._fd = None
-
-#    def rename(self, newname):
-#        """Rename the map"""
-#        #import pdb; pdb.set_trace()
-#        newname = clean_map_name(newname)
-#        if self._name:
-#            libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
-#                            ctypes.c_char_p(self._name),
-#                            ctypes.c_char_p(newname))
-#        self._name = newname
-
 
 
 
