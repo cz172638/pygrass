@@ -17,6 +17,7 @@ import grass.lib.rowio as librowio
 from raster_type import TYPE as RTYPE
 from raster_type import RTYPE_STR
 from region import Region
+import env
 from buffer import Buffer
 from segment import Segment
 from rowio import RowIO
@@ -224,8 +225,8 @@ class RasterAbstractBase(object):
         """Remove the map"""
         if self.isopen():
             self.close()
-        libgis.G_remove(self.mtype.lower(),
-                        self.name)
+        grasscore.run_command('g.remove', rast = self.name)
+
 
     def name_mapset(self, name = None, mapset = None):
         if name == None: name = self.name
@@ -244,9 +245,7 @@ class RasterAbstractBase(object):
             warning(_("The map is open, closing the map"))
             self.close()
         if self.exist():
-            libgis.G_rename(ctypes.c_char_p(self.mtype.lower()),
-                            ctypes.c_char_p(self.name),
-                            ctypes.c_char_p(newname))
+            env.rename(self.name, newname, 'rast')
         self._name = newname
 
 
@@ -616,11 +615,12 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
     >>> el._write('new', overwrite = True)
 
     """
-    def __new__(cls, name,  mapset = "", mtype='FCELL', mode = 'r+',
+    def __new__(cls, name,  mapset = "", mtype='CELL', mode = 'r+',
                 overwrite = False):
         reg = Region()
         shape = (reg.rows, reg.cols)
         mapset = libgis.G_find_raster(name, mapset)
+        gtype = None
         if mapset:
             # map exist, set the map type
             fd = libraster.Rast_open_old( name, mapset )
@@ -633,6 +633,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
                                 mode = mode,
                                 shape = shape)
         obj.mtype = mtype.upper()
+        obj.gtype = gtype if gtype else RTYPE[mtype]['grass type']
         obj._rows = reg.rows
         obj._cols = reg.cols
         obj.filename = filename
@@ -666,6 +667,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         if out_arr.dtype.kind in 'bui':
             # there is not support for boolean maps, so convert into integer
             out_arr = out_arr.astype(np.int32)
+            out_arr.mtype = 'CELL'
         #out_arr.p = out_arr.ctypes.data_as(out_arr.pointer_type)
         return np.ndarray.__array_wrap__(self, out_arr, context)
 
@@ -705,6 +707,10 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         r.in.bin input=/home/pietro/docdat/phd/thesis/gis/north_carolina/user1/.tmp/eraclito/14325.0 output=new title='' bytes=1,anull='' --verbose --overwrite north=228500.0 south=215000.0 east=645000.0 west=630000.0 rows=1350 cols=1500
 
         """
+        if mapname == None: mapname = self.name
+        if overwrite == None: overwrite = self.overwrite
+        self.flush()
+        self.tofile(self.filename)
         size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
         #print size, kind
         if kind == 'i':
@@ -712,7 +718,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
             size = 4
         else: kind
         size = None if kind == 'f' else size
-        if mapname == None: mapname = self.name
+
         #print size, kind
         return grasscore.run_command('r.in.bin', flags = kind,
                                      input = self.filename, output = mapname,
