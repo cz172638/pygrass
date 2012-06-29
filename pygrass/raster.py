@@ -752,7 +752,27 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         self._fd = None
 
 
+def random_map_only_columns(mapname, mtype, overwrite = True, factor = 100):
+    region = Region()
+    random_map = RasterRow(mapname, mtype, overwrite = overwrite)
+    row_buf = Buffer((region.cols, ), mtype,
+                         buffer = (np.random.random(region.cols,)*factor).data )
+    random_map.open(mode = 'w')
+    for _ in xrange(region.rows):
+        random_map.put_row(row_buf)
+    random_map.close()
+    return random_map
 
+def random_map(mapname, mtype, overwrite = True, factor = 100):
+    region = Region()
+    random_map = RasterRow(mapname, mtype, overwrite = overwrite)
+    random_map.open(mode = 'w')
+    for _ in xrange(region.rows):
+        row_buf = Buffer((region.cols, ), mtype,
+                         buffer = (np.random.random(region.cols,)*factor).data )
+        random_map.put_row(row_buf)
+    random_map.close()
+    return random_map
 
 
 if __name__ == "__main__":

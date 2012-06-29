@@ -30,3 +30,5 @@ def exist(mapname, mapset = ''):
         return True
     else:
         return False
+
+
