@@ -17,6 +17,7 @@ import grass.lib.rowio as librowio
 from raster_type import TYPE as RTYPE
 from raster_type import RTYPE_STR
 from region import Region
+from category import Category
 import env
 from buffer import Buffer
 from segment import Segment
@@ -76,6 +77,7 @@ class RasterAbstractBase(object):
         self.mtype = mtype.upper()
         self.overwrite = overwrite
         #self.region = Region()
+        self.cats = Category()
 
         self._name = name
         ## Private attribute `_type` is the RASTER_TYPE of the map
@@ -153,6 +155,14 @@ class RasterAbstractBase(object):
         return self._min.value, self._max.value
 
     range = property(fget = _get_range, fset = _set_unchangeable)
+
+    def _get_cats_title(self):
+        return self.cats.title
+
+    def _set_cats_title(self, newtitle):
+        self.cats.title = newtitle
+
+    cats_title = property(fget = _get_cats_title, fset = _set_cats_title)
 
     def __unicode__(self):
         return self.name_mapset()
@@ -262,6 +272,56 @@ class RasterAbstractBase(object):
         # update rows and cols attributes
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
+
+
+    def has_cats(self):
+        """Return True if the raster map has categories"""
+        if self.exist():
+            self.cats.read(self)
+            if len(self.cats) != 0:
+                return True
+        return False
+
+    def num_cats(self):
+        """Return the number of categories"""
+        return len(self.cats)
+
+    def copy_cats(self, raster):
+        """Copy categories from another raster map object"""
+        self.cats.copy(raster.cats)
+
+    def sort_cats(self):
+        """Sort categories order by range"""
+        self.cats.sort()
+
+    def read_cats(self):
+        """Read category from the raster map file"""
+        self.cats.read(self)
+
+    def write_cats(self):
+        """Write category to the raster map file"""
+        self.cats.write(self)
+
+    def get_cats(self):
+        """Return a category object"""
+        cat = Category()
+        cat.read(self)
+        return cat
+
+    def set_cats(self, category):
+        """The internal categories are copied from this object."""
+        self.cats.copy(category)
+
+    def get_cat(self, label):
+        """Return a category given an index or a label"""
+        return self.cats[label]
+
+    def set_cat(self, label, min_cat, max_cat):
+        """Set or update a category"""
+#        mi, ma = self.range
+#        if min_cat <= mi and max_cat >= ma:
+#            raise TypeError("Min or max are outside the range")
+        self.cats.set_cat(label, min_cat, max_cat)
 
 class RasterRow(RasterAbstractBase):
     """Raster_row_access": Inherits: "Raster_abstract_base" and implements

@@ -55,6 +55,95 @@ We can rename the map:   ::
     new
 
 
+
+
+.. _RasterCategory-label:
+
+Categories
+----------
+
+It is possible to check if the map has or not the categories with the
+``has_cats`` method. ::
+
+    >>> elev.has_cats()
+    False
+
+Opening a map that has category, for example the "landcove_1m" raster map
+from the North Carolina mapset. The ``has_cats`` method return True. ::
+
+    >>> land = pygrass.RasterRow('landcover_1m')
+    >>> land.has_cats()
+    True
+
+Get and set the categories title, with: ::
+
+    >>> land.cats_title
+    'Rural area: Landcover'
+    >>> land.cats_title = 'Rural area: Landcover2'
+    >>> land.cats_title
+    'Rural area: Landcover2'
+    >>> land.cats_title = 'Rural area: Landcover'
+
+Get the number of categories of the map with: ::
+
+    >>> land.num_cats()
+    11
+
+See all the categories with: ::
+
+    >>> land.cats
+    [('pond', 1, 1),
+     ('forest', 2, 2),
+     ('developed', 3, 3),
+     ('bare', 4, 4),
+     ('paved road', 5, 5),
+     ('dirt road', 6, 6),
+     ('vineyard', 7, 7),
+     ('agriculture', 8, 8),
+     ('wetland', 9, 9),
+     ('bare ground path', 10, 10),
+     ('grass', 11, 11)]
+
+Access to single category, using Rast_get_ith_cat(), with: ::
+
+    >>> land.cats[0]
+    ('pond', 1, 1)
+    >>> land.cats['pond']
+    ('pond', 1, 1)
+    >>> land.get_cat(0)
+    ('pond', 1, 1)
+    >>> land.get_cat('pond')
+    ('pond', 1, 1)
+
+Add new or change existing categories: ::
+
+    >>> land.set_cat('label', 1, 1)
+    >>> land.get_cat('label')
+    ('label', 1, 1)
+    >>> land.set_cat('pond', 1, 1)
+
+
+Sort categories, with: ::
+
+    >>> land.sort_cats()
+
+
+Copy categories from another raster map with: ::
+
+    >>> land.copy_cats(elev)
+
+Read and Write: ::
+
+    >>> land.read_cats()
+    >>> #land.write_cats()
+
+Get a Category object or set from a Category object: ::
+
+    >>> cats = land.get_cats()
+    >>> land.set_cats(cats)
+
+
+
 .. _RasterRow-label:
 
 RastRow
@@ -65,9 +154,7 @@ support to read and write to the same map at the same time, for this
 functionality, please see the RasterSegment class.
 The RasterRow class allow to read in a randomly order the row from a map, but
 it is only possible to write the map using only a sequence order, therefore every
-time you are writing a new map, the row is add to the file as the last row.
-
-::
+time you are writing a new map, the row is add to the file as the last row. ::
 
     >>> pygrass = reload(pygrass)
     >>> elev = pygrass.RasterRow('elevation')
@@ -122,8 +209,7 @@ The RasterRowIO class use the grass `RowIO library`_, and implement a row
 cache. The RasterRowIO class support only reading the raster, because the
 raster rows can only be written in sequential order, writing by row id is not
 supported by design. Hence, we should use the rowio lib only for caching rows
-for reading and use the default row write access as in the RasterRow class.
-
+for reading and use the default row write access as in the RasterRow class. ::
 
     >>> pygrass = reload(pygrass)
     >>> elev = pygrass.RasterRowIO('elevation')
@@ -214,7 +300,7 @@ RasterNumpy
 
 The RasterNumpy class, is based on the `numpy.memmap`_ class If you open an
 existing map, the map will be copied on a binary format, and read to avoid
-to load all the map in memory.
+to load all the map in memory. ::
 
     >>> import pygrass
     >>> elev = pygrass.RasterNumpy('elevation', 'PERMANENT')
