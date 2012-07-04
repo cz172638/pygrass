@@ -15,7 +15,7 @@ import grass.script as grass
 class Region():
     def __init__(self):
         self._region = libgis.Cell_head()
-        libgis.G_get_window(c.byref(self._region))
+        libgis.G_get_set_window(c.byref(self._region))
 
 
     def _set_param(self, key, value):

@@ -93,19 +93,38 @@ class RasterAbstractBase(object):
         # when you open the file, using Rast_window_cols()
         self._cols = None
 
-
     def _get_mtype(self):
         return self._mtype
 
     def _set_mtype(self, mtype):
         if mtype.upper() not in ('CELL', 'FCELL', 'DCELL'):
             #fatal(_("Raser type: {0} not supported".format(mtype) ) )
-            raise ValueError(_("Raser type: {0} not supported".format(mtype) ))
+            raise ValueError(_("Raster type: {0} not supported (\"CELL\",\"FCELL\",\"DCELL\")".format(mtype) ))
         self._mtype = mtype
         self._gtype = RTYPE[self.mtype]['grass type']
 
     mtype = property(fget = _get_mtype, fset = _set_mtype)
 
+    def _get_mode(self):
+        return self._mode
+
+    def _set_mode(self, mode):
+        if mode.upper() not in ('R', 'W'):
+            raise ValueError(_("Mode type: {0} not supported (\"r\", \"w\")".format(mode) ))
+        self._mode = mode
+    
+    mode = property(fget = _get_mode, fset = _set_mode)
+    
+    def _get_overwrite(self):
+        return self._overwrite
+
+    def _set_overwrite(self, overwrite):
+        if overwrite not in (True, False):
+            raise ValueError(_("Overwrite type: {0} not supported (True/False)".format(overwrite) ))
+        self._overwrite = overwrite
+    
+    overwrite = property(fget = _get_overwrite, fset = _set_overwrite)
+    
     def _get_name(self):
         """Private method to return the Raster name"""
         return self._name
@@ -214,8 +233,7 @@ class RasterAbstractBase(object):
 
     def isopen(self):
         """Return True if the map is open False otherwise"""
-        return True if self._fd != None else False
-
+        return True if self._fd != None and self._fd >= 0 else False
 
     def close(self):
         """Close the map"""
@@ -366,7 +384,7 @@ class RasterRow(RasterAbstractBase):
         return None
 
 
-    def open(self, mode = '', mtype = '', overwrite = ''):
+    def open(self, mode = 'r', mtype = 'CELL', overwrite = False):
         """Open the raster if exist or created a new one.
 
         Parameters
@@ -377,6 +395,8 @@ class RasterRow(RasterAbstractBase):
         type: string
             If a new map is open, specify the type of the map(`CELL`, `FCELL`,
             `DCELL`)
+        overwrite: Boolean
+            Use this flag to set the overwrite mode of existing raster maps
 
 
         if the map already exist, automatically check the type and set:
@@ -387,15 +407,11 @@ class RasterRow(RasterAbstractBase):
             * self._gtype
             * self._rows and self._cols
         """
-        # check input parameters and overwrite attributes
-        if mode != '':
-            self.mode = mode
-        if mtype != '':
-                self.mtype = mtype.upper()
-                self._gtype = RTYPE[self.mtype]['grass type']
-        if overwrite != '':
-            self.overwrite = overwrite
-        # check if exist and instantiate all the privite attributes
+        self.mode = mode
+        self.mtype = mtype
+        self.overwrite = overwrite
+        
+        # check if exist and instantiate all the private attributes
         if self.exist():
             if self.mode == 'r':
                 # the map exist, read mode
@@ -404,7 +420,7 @@ class RasterRow(RasterAbstractBase):
                 self.mtype = RTYPE_STR[self._gtype]
             elif self.overwrite:
                 if self._gtype == None:
-                    fatal(_("Raster type not define"))
+                    fatal(_("Raster type not defined"))
                 #TODO: may be we should remove the warning.
                 warning(_(WARN_OVERWRITE.format(self)))
                 self._fd = libraster.Rast_open_new( self.name, self._gtype )
@@ -429,14 +445,12 @@ class RasterRowIO(RasterRow):
         self.rowio = RowIO()
         super(RasterRowIO, self).__init__(name, *args, **kargs)
 
-    def open(self, mode = '', mtype = '', overwrite = ''):
+    def open(self, mode = 'r', mtype = 'CELL', overwrite = False):
         super(RasterRowIO, self).open(mode, mtype, overwrite)
-        if self.mode == 'r':
-            self.rowio.open(self._fd, self.rows, self.cols, self.mtype)
+        self.rowio.open(self._fd, self.rows, self.cols, self.mtype)
 
     def close(self):
         if self.isopen():
-            #self.rowio.flush()
             self.rowio.release()
             libraster.Rast_close(self._fd)
             # update rows and cols attributes
@@ -483,6 +497,16 @@ class RasterSegment(RasterAbstractBase):
         self.segment = Segment(srows, scols, maxmem)
         super(RasterSegment, self).__init__(name, *args, **kargs)
 
+    def _get_mode(self):
+        return self._mode
+
+    def _set_mode(self, mode):
+        if mode.upper() not in ('R', 'W', 'RW'):
+            raise ValueError(_("Mode type: {0} not supported (\"r\", \"w\",\"rw\")".format(mode) ))
+        self._mode = mode
+    
+    mode = property(fget = _get_mode, fset = _set_mode)
+    
     def __setitem__(self, key, row):
         """Return the row of Raster object, slice allowed."""
         if isinstance( key, slice ) :
@@ -502,22 +526,24 @@ class RasterSegment(RasterAbstractBase):
             fatal("Invalid argument type.")
 
     def map2segment(self):
-        """Transform an existing map to segment files.
+        """Transform an existing map to segment file.
         """
-        row_buffer = Buffer((self._cols), self.mtype)
-        for row in xrange(self._rows):
-            libraster.Rast_get_row(self._fd, row_buffer.p, row, self._gtype)
-            libseg.segment_put_row(ctypes.byref(self.segment.cseg),
-                                   row_buffer.p, row)
+        if self.isopen():
+            row_buffer = Buffer((self._cols), self.mtype)
+            for row in xrange(self._rows):
+                libraster.Rast_get_row(self._fd, row_buffer.p, row, self._gtype)
+                libseg.segment_put_row(ctypes.byref(self.segment.cseg),
+                                       row_buffer.p, row)
 
     def segment2map(self):
-        """Transform the segment files to a map.
+        """Transform the segment file to a map.
         """
-        row_buffer = Buffer((self._cols), self.mtype)
-        for row in xrange(self._rows):
-            libseg.segment_get_row(ctypes.byref(self.segment.cseg),
-                                   row_buffer.p, row)
-            libraster.Rast_put_row(self._fd, row_buffer.p, self._gtype)
+        if self.isopen():
+            row_buffer = Buffer((self._cols), self.mtype)
+            for row in xrange(self._rows):
+                libseg.segment_get_row(ctypes.byref(self.segment.cseg),
+                                       row_buffer.p, row)
+                libraster.Rast_put_row(self._fd, row_buffer.p, self._gtype)
 
     def get_row(self, row, row_buffer = None):
         """Return the row using the `segment.get_row` method
@@ -547,7 +573,6 @@ class RasterSegment(RasterAbstractBase):
         """
         libseg.segment_put_row(ctypes.byref(self.segment.cseg),
                                row_buffer.p, row)
-        return row_buffer
 
     def get(self, row, col):
         """Return the map value using the `segment.get` method
@@ -580,9 +605,8 @@ class RasterSegment(RasterAbstractBase):
         self.segment.val.value = val
         libseg.segment_put(ctypes.byref(self.segment.cseg),
                            ctypes.byref(self.segment.val), row, col)
-        return None
-
-    def open(self, mtype = ''):
+        
+    def open(self, mode = 'r', mtype = 'DCELL', overwrite = False):
         """Open the map, if the map already exist: determine the map type
         and copy the map to the segment files;
         else, open a new segment map.
@@ -590,27 +614,54 @@ class RasterSegment(RasterAbstractBase):
         Parameters
         ------------
 
+        mode: string, optional
+            Specify if the map will be open with read, write or read/write mode ('r', 'w', 'rw')
         mtype: string, optional
             Specify the map type, valid only for new maps: CELL, FCELL, DCELL;
+        overwrite: Boolean, optional
+            Use this flag to set the overwrite mode of existing raster maps
         """
         # read rows and cols from the active region
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
+        
+        self.overwrite = overwrite
+        self.mode = mode
+        self.mtype = mtype
+        
         if self.exist():
-            self._fd = libraster.Rast_open_old( self.name, self.mapset )
-            self._gtype = libraster.Rast_get_map_type ( self._fd )
-            self.mtype = RTYPE_STR[self._gtype]
-            # initialize the segment, I need to determin the mtype of the map
-            # before to open the segment
-            self.segment.open(self)
-            self.map2segment()
-            libraster.Rast_close(self._fd)
+            if (self.mode == "w" or self.mode == "rw") and self.overwrite == False:
+                fatal(_("Raster map <{0}> already exists. Use overwrite flag to overwrite".format(self) ) )
+                
+            # We copy the raster map content into the segments
+            if self.mode == "rw" or self.mode == "r":
+                self._fd = libraster.Rast_open_old( self.name, self.mapset )
+                self._gtype = libraster.Rast_get_map_type ( self._fd )
+                self.mtype = RTYPE_STR[self._gtype]
+                # initialize the segment, I need to determine the mtype of the map
+                # before to open the segment
+                self.segment.open(self)
+                self.map2segment()
+                self.segment.flush()
+            
+                if self.mode == "rw":
+                    warning(_(WARN_OVERWRITE.format(self)))
+                    # Close the file descriptor and open it as new again
+                    libraster.Rast_close(self._fd)
+                    self._fd = libraster.Rast_open_new( self.name, self._gtype )
+            # Here we simply overwrite the existing map without content copying
+            elif self.mode == "w":
+                warning(_(WARN_OVERWRITE.format(self)))
+                self._gtype = RTYPE[self.mtype]['grass type']
+                self.segment.open(self)
+                self._fd = libraster.Rast_open_new( self.name, self._gtype )
         else:
-            if mtype: self.mtype = mtype
+            if self.mode == "r":
+                fatal(_("Raster map <{0}> does not exists".format(self) ) )
+                
             self._gtype = RTYPE[self.mtype]['grass type']
             self.segment.open(self)
-        self._fd = libraster.Rast_open_new( self.name, self._gtype )
-
+            self._fd = libraster.Rast_open_new( self.name, self._gtype )
 
     def close(self, rm_temp_files = True):
         """Close the map, copy the segment files to the map.
@@ -622,8 +673,9 @@ class RasterSegment(RasterAbstractBase):
             If True all the segments file will be removed.
         """
         if self.isopen():
-            self.segment.flush()
-            self.segment2map()
+            if self.mode == "w" or self.mode == "rw":
+                self.segment.flush()
+                self.segment2map()
             if rm_temp_files:
                 self.segment.close()
             else:
@@ -680,10 +732,8 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         gtype = None
         if mapset:
             # map exist, set the map type
-            fd = libraster.Rast_open_old( name, mapset )
-            gtype = libraster.Rast_get_map_type ( fd )
+            gtype = libraster.Rast_map_type (name, mapset)
             mtype = RTYPE_STR[ gtype ]
-            libraster.Rast_close( fd )
         filename = grasscore.tempfile()
         obj = np.memmap.__new__(cls, filename = filename,
                                 dtype = RTYPE[mtype]['numpy'],
@@ -708,8 +758,8 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
             self.mode = obj.mode
             self._rows = obj._rows
             self._cols = obj._cols
-            self._name = None
-            self.mapset = None
+            self._name = obj._name
+            self.mapset = obj.mapset
             self.reg = obj.reg
             self.overwrite = obj.overwrite
             self.mtype = obj.mtype
@@ -717,6 +767,16 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         else:
             self._mmap = None
 
+    def _get_mode(self):
+        return self._mode
+
+    def _set_mode(self, mode):
+        if mode.upper() not in ('R', 'W', "R+", "W+"):
+            raise ValueError(_("Mode type: {0} not supported (\"r\", \"w\",\"r+\", \"w+\")".format(mode) ))
+        self._mode = mode
+    
+    mode = property(fget = _get_mode, fset = _set_mode)
+    
     def __array_wrap__(self, out_arr, context=None):
         """See:
         http://docs.scipy.org/doc/numpy/user/basics.subclassing.html#array-wrap-for-ufuncs"""
@@ -740,33 +800,29 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         else:
             raise ValueError(_('Invalid size {0}'.format(size)))
 
-    def _read(self, mapname = None, null = None):
+    def _read(self):
         """!Read raster map into array
-
-        @param mapname name of raster map to be read
-        @param null null value
 
         @return 0 on success
         @return non-zero code on failure
         """
+        print "start export"
+        self.null = None
+        
         size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
         kind = 'f' if kind == 'd' else kind
-        if mapname == None: mapname = self.name
-        return grasscore.run_command('r.out.bin', flags = kind,
-                                     input = mapname, output = self.filename,
-                                     bytes = size, null = null,
+        ret = grasscore.run_command('r.out.bin', flags = kind,
+                                     input = self._name, output = self.filename,
+                                     bytes = size, null = self.null,
                                      quiet = True)
+        print "end export"
+        return ret
 
-    def _write(self, mapname = None, title = None, null = None,
-              overwrite = None):
+    def _write(self):
         """
         r.in.bin input=/home/pietro/docdat/phd/thesis/gis/north_carolina/user1/.tmp/eraclito/14325.0 output=new title='' bytes=1,anull='' --verbose --overwrite north=228500.0 south=215000.0 east=645000.0 west=630000.0 rows=1350 cols=1500
 
         """
-        if mapname == None: mapname = self.name
-        if overwrite == None: overwrite = self.overwrite
-        self.flush()
-        self.tofile(self.filename)
         size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
         #print size, kind
         if kind == 'i':
@@ -774,18 +830,26 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
             size = 4
         else: kind
         size = None if kind == 'f' else size
-
-        return grasscore.run_command('r.in.bin', flags = kind,
-                                     input = self.filename, output = mapname,
-                                     title = title, bytes = size,
-                                     anull = null, overwrite = overwrite,
-                                     verbose = True,
-                                     north = self.reg.north,
-                                     south = self.reg.south,
-                                     east  = self.reg.east,
-                                     west  = self.reg.west,
-                                     rows  = self.reg.rows,
-                                     cols  = self.reg.cols)
+        
+        # To be set in the future
+        self.title = None
+        self.null = None
+        
+        if self.overwrite == True and (self.mode == "w" or self.mode == "w+"):
+            print "start import"
+            ret = grasscore.run_command('r.in.bin', flags = kind,
+                                         input = self.filename, output = self._name,
+                                         title = self.title, bytes = size,
+                                         anull = self.null, overwrite = self.overwrite,
+                                         verbose = True,
+                                         north = self.reg.north,
+                                         south = self.reg.south,
+                                         east  = self.reg.east,
+                                         west  = self.reg.west,
+                                         rows  = self.reg.rows,
+                                         cols  = self.reg.cols)
+            print "end import"
+            return ret
 
     def open(self, mtype = '', null = None):
         """Open the map, if the map already exist: determine the map type
@@ -798,9 +862,11 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         mtype: string, optional
             Specify the map type, valid only for new maps: CELL, FCELL, DCELL;
         """
+        
+        self.null = null
         # rows and cols already set in __new__
         if self.exist():
-            self._read(null = null)
+            self._read()
         else:
             if mtype: self.mtype = mtype
             self._gtype = RTYPE[self.mtype]['grass type']
