@@ -4,12 +4,16 @@ Raster
 ======
 
 PyGrass use 4 different Raster classes, that respect the 4 different approaches
-of C grass API. PyGrass Allow user to open the maps, in read and write mode,
-row by row (:ref:`RasterRow-label` class) using the
-`Raster library`_, using the `RowIO library`_ (:ref:`RasterRowIO-label` class),
-using the `Segmentation library`_ that allow users to read and write the map
-at the same time (:ref:`RasterSegment-label` class), and using the numpy
-interface to the map (:ref:`RasterNumpy-label` class).
+of C grass API.
+The read access is row wise for :ref:`RasterRow-label` and
+:ref:`RasterRowIO-label` and additionally
+cached in the RowIO class. Booth classes write sequentially.
+RowIO is row cached, :ref:`RasterSegment-label` and :ref:`RasterNumpy-label`
+are tile cached for reading and writing therefore a randomly access is possible.
+Hence RasterRow and RasterRowIO should be used in case for fast (cached)
+row read access and RasterRow for fast sequential writing.
+Segment and Numpy should be used for random access, but numpy only for files
+not larger than 2GB.
 
 
 ==========================  =======================  ========  ============
@@ -62,6 +66,8 @@ We can rename the map:   ::
 Categories
 ----------
 
+All the raster classes support raster categories and share commons methods
+to modify the raster category.
 It is possible to check if the map has or not the categories with the
 ``has_cats`` method. ::
 
@@ -92,34 +98,34 @@ Get the number of categories of the map with: ::
 See all the categories with: ::
 
     >>> land.cats
-    [('pond', 1, 1),
-     ('forest', 2, 2),
-     ('developed', 3, 3),
-     ('bare', 4, 4),
-     ('paved road', 5, 5),
-     ('dirt road', 6, 6),
-     ('vineyard', 7, 7),
-     ('agriculture', 8, 8),
-     ('wetland', 9, 9),
-     ('bare ground path', 10, 10),
-     ('grass', 11, 11)]
+    [('pond', 1, None),
+     ('forest', 2, None),
+     ('developed', 3, None),
+     ('bare', 4, None),
+     ('paved road', 5, None),
+     ('dirt road', 6, None),
+     ('vineyard', 7, None),
+     ('agriculture', 8, None),
+     ('wetland', 9, None),
+     ('bare ground path', 10, None),
+     ('grass', 11, None)]
 
 Access to single category, using Rast_get_ith_cat(), with: ::
 
     >>> land.cats[0]
-    ('pond', 1, 1)
+    ('pond', 1, None)
     >>> land.cats['pond']
-    ('pond', 1, 1)
+    ('pond', 1, None)
     >>> land.get_cat(0)
-    ('pond', 1, 1)
+    ('pond', 1, None)
     >>> land.get_cat('pond')
-    ('pond', 1, 1)
+    ('pond', 1, None)
 
 Add new or change existing categories: ::
 
-    >>> land.set_cat('label', 1, 1)
+    >>> land.set_cat('label', 1)
     >>> land.get_cat('label')
-    ('label', 1, 1)
+    ('label', 1, None)
     >>> land.set_cat('pond', 1, 1)
 
 
@@ -142,6 +148,10 @@ Get a Category object or set from a Category object: ::
     >>> cats = land.get_cats()
     >>> land.set_cats(cats)
 
+Export and import from a file: ::
+
+    >>> land.write_cats_rules('land_rules.csv', ';')
+    >>> land.read_cats_rules('land_rules.csv', ';')
 
 
 .. _RasterRow-label:
@@ -149,9 +159,10 @@ Get a Category object or set from a Category object: ::
 RastRow
 -------
 
-The RasterRow class use the Grass C API to read and write the map, there is not
-support to read and write to the same map at the same time, for this
-functionality, please see the RasterSegment class.
+PyGrass allow user to open the maps, in read and write mode,
+row by row using the `Raster library`_, there is not support to read and write
+to the same map at the same time, for this functionality, please see the
+:ref:`RasterSegment-label` and :ref:`RasterNumpy-label` classes.
 The RasterRow class allow to read in a randomly order the row from a map, but
 it is only possible to write the map using only a sequence order, therefore every
 time you are writing a new map, the row is add to the file as the last row. ::
@@ -229,8 +240,8 @@ for reading and use the default row write access as in the RasterRow class. ::
 RastSegment
 -----------
 
-The RasterSegment class use the grass segment library, it work dividing the
-raster map into small different files, that grass read load into the memory
+The RasterSegment class use the grass `Segmentation library`_, it work dividing
+the raster map into small different files, that grass read load into the memory
 and write to the hardisk.
 The segment library allow to open a map in a read-write mode. ::
 

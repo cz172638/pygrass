@@ -171,9 +171,13 @@ class Category(object):
                                          self._gtype)
         # Manage C function Errors
         if lab == '': print(_("Error executing: Rast_get_ith_cat")); raise
-        return lab, min_cat.contents.value, max_cat.contents.value
+        if max_cat.contents.value == min_cat.contents.value:
+            max_cat = None
+        else:
+            max_cat = max_cat.contents.value
+        return lab, min_cat.contents.value, max_cat
 
-    def set_cat(self, label, min_cat, max_cat):
+    def set_cat(self, label, min_cat, max_cat = None):
         """Adds the label for range min through max in category structure cats.
 
         int Rast_set_cat(const void * 	rast1,
@@ -183,6 +187,7 @@ class Category(object):
                          RASTER_MAP_TYPE 	data_type
                          )
         """
+        max_cat = min_cat if max_cat == None else max_cat
         min_cat = ctypes.pointer(RTYPE[self.mtype]['grass def'](min_cat) )
         max_cat = ctypes.pointer(RTYPE[self.mtype]['grass def'](max_cat) )
         err = libraster.Rast_set_cat(ctypes.cast(min_cat, ctypes.c_void_p),
@@ -249,16 +254,56 @@ class Category(object):
     def set_cats_fmt(self, fmt):
         pass
 
-    def from_rules(self, filename):
-        """Copy categories from a rules file"""
-        pass
+    def read_rules(self, filename, sep = ':'):
+        """Copy categories from a rules file, default separetor is ':', the
+        columns must be: min and/or max and label.
+
+        1:forest
+        2:road
+        3:urban
+
+        0.:0.5:forest
+        0.5:1.0:road
+        1.0:1.5:urban"""
+        with open(filename, 'r') as f:
+            for row in f.readlines():
+                cat = row.strip().split(sep)
+                if len(cat) == 2:
+                    label, min_cat = cat
+                    max_cat = min_cat
+                elif len(cat) == 3:
+                    label, min_cat, max_cat = cat
+                else:
+                    raise TypeError("Row lenght is greater than 3")
+                #import pdb; pdb.set_trace()
+                self.set_cat(label,
+                             # convert string into int32, float32 or float64
+                             RTYPE[self.mtype]['numpy'](min_cat),
+                             RTYPE[self.mtype]['numpy'](max_cat))
+
+    def write_rules(self, filename, sep = ':'):
+        """Copy categories from a rules file, default separetor is ':', the
+        columns must be: min and/or max and label.
+
+        1:forest
+        2:road
+        3:urban
+
+        0.:0.5:forest
+        0.5:1.0:road
+        1.0:1.5:urban"""
+        with open(filename, 'w') as f:
+            cats = []
+            for cat in self.__iter__():
+                if cat[-1] == None:
+                    cat = cat[:-1]
+                cats.append( sep.join( [str(i) for i in cat] ) )
+            f.write('\n'.join(cats))
+
 
     def sort(self):
         libraster.Rast_sort_cats(ctypes.byref(self.cats))
 
-    def get(self, value):
-        """Return the category given a value"""
-        pass
 
     def labels(self):
         labels = []
@@ -266,7 +311,4 @@ class Category(object):
             labels.append(ctypes.cast(self.cats.labels[i],
                                       ctypes.c_char_p).value)
         return labels
-
-    def rules(self):
-        pass
 

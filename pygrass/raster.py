@@ -302,6 +302,14 @@ class RasterAbstractBase(object):
         """Write category to the raster map file"""
         self.cats.write(self)
 
+    def read_cats_rules(self, filename, sep = ':'):
+        """Read category from the raster map file"""
+        self.cats.read_rules(filename, sep)
+
+    def write_cats_rules(self, filename, sep = ':'):
+        """Write category to the raster map file"""
+        self.cats.write_rules(filename, sep)
+
     def get_cats(self):
         """Return a category object"""
         cat = Category()
@@ -316,7 +324,7 @@ class RasterAbstractBase(object):
         """Return a category given an index or a label"""
         return self.cats[label]
 
-    def set_cat(self, label, min_cat, max_cat):
+    def set_cat(self, label, min_cat, max_cat = None):
         """Set or update a category"""
 #        mi, ma = self.range
 #        if min_cat <= mi and max_cat >= ma:
