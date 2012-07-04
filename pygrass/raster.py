@@ -324,12 +324,9 @@ class RasterAbstractBase(object):
         """Return a category given an index or a label"""
         return self.cats[label]
 
-    def set_cat(self, label, min_cat, max_cat = None):
+    def set_cat(self, label, min_cat, max_cat = None, index = None):
         """Set or update a category"""
-#        mi, ma = self.range
-#        if min_cat <= mi and max_cat >= ma:
-#            raise TypeError("Min or max are outside the range")
-        self.cats.set_cat(label, min_cat, max_cat)
+        self.cats.set_cat( index, (label, min_cat, max_cat) )
 
 class RasterRow(RasterAbstractBase):
     """Raster_row_access": Inherits: "Raster_abstract_base" and implements
