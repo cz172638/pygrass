@@ -430,7 +430,7 @@ class RasterRowIO(RasterRow):
         super(RasterRowIO, self).__init__(name, *args, **kargs)
 
     def open(self, mode = '', mtype = '', overwrite = ''):
-        super(RasterRowIO, self).open(mode = '', mtype = '', overwrite = '')
+        super(RasterRowIO, self).open(mode, mtype, overwrite)
         if self.mode == 'r':
             self.rowio.open(self._fd, self.rows, self.cols, self.mtype)
 
