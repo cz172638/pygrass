@@ -224,7 +224,7 @@ for reading and use the default row write access as in the RasterRow class. ::
 
     >>> pygrass = reload(pygrass)
     >>> elev = pygrass.RasterRowIO('elevation')
-    >>> elev.open()
+    >>> elev.open('r')
     >>> for row in elev[:5]: print(row[:3])
     [ 141.99613953  141.27848816  141.37904358]
     [ 142.90461731  142.39450073  142.68611145]

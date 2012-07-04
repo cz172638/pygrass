@@ -421,7 +421,7 @@ class RasterRow(RasterAbstractBase):
         self._cols = libraster.Rast_window_cols()
 
 
-class RasterRowIO(RasterAbstractBase):
+class RasterRowIO(RasterRow):
     """Raster_row_cache_access": The same as "Raster_row_access" but uses
     the ROWIO library for cached row access
     """
@@ -429,15 +429,10 @@ class RasterRowIO(RasterAbstractBase):
         self.rowio = RowIO()
         super(RasterRowIO, self).__init__(name, *args, **kargs)
 
-    def open(self):
-        # read rows and cols from the active region
-        self._rows = libraster.Rast_window_rows()
-        self._cols = libraster.Rast_window_cols()
-        # open the map
-        self._fd = libraster.Rast_open_old( self.name, self.mapset )
-        self._gtype = libraster.Rast_get_map_type ( self._fd )
-        self.mtype = RTYPE_STR[self._gtype]
-        self.rowio.open(self._fd, self.rows, self.cols, self.mtype)
+    def open(self, mode = '', mtype = '', overwrite = ''):
+        super(RasterRowIO, self).open(mode = '', mtype = '', overwrite = '')
+        if self.mode == 'r':
+            self.rowio.open(self._fd, self.rows, self.cols, self.mtype)
 
     def close(self):
         if self.isopen():
