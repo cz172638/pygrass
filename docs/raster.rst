@@ -184,8 +184,8 @@ time you are writing a new map, the row is add to the file as the last row. ::
     [ 144.56524658  144.58493042  144.86477661]
     [ 144.99488831  145.22894287  145.57142639]
     >>> # we can open a new map in write mode
-    >>> new = pygrass.RasterRow('new', mode = 'w')
-    >>> new.open()
+    >>> new = pygrass.RasterRow('new')
+    >>> new.open('w', 'CELL')
     >>> # for each elev row we can perform computation, and write the result into
     >>> # the new map
     >>> for row in elev:
@@ -255,7 +255,7 @@ The segment library allow to open a map in a read-write mode. ::
     [ 144.56524658  144.58493042  144.86477661]
     [ 144.99488831  145.22894287  145.57142639]
     >>> new = pygrass.RasterSegment('new')
-    >>> new.open()
+    >>> new.open('w', 'CELL')
     >>> for irow in xrange(elev.rows):
     ...     new[irow] = elev[irow] < 144
     ...
@@ -315,7 +315,7 @@ to load all the map in memory. ::
 
     >>> import pygrass
     >>> elev = pygrass.RasterNumpy('elevation', 'PERMANENT')
-    >>> elev.open()
+    >>> elev.open('r')
     >>> for row in elev[:5]: print(row[:3])
     [ 141.99613953  141.27848816  141.37904358]
     [ 142.90461731  142.39450073  142.68611145]

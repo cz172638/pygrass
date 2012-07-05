@@ -63,8 +63,7 @@ class RasterAbstractBase(object):
     * Renaming, deletion, ...
     """
 
-    def __init__(self, name, mapset = "",
-                 mtype = "CELL", overwrite = False):
+    def __init__(self, name, mapset = ""):
         """The constructor need at least the name of the map
         *optional* fields are:
 
@@ -74,14 +73,10 @@ class RasterAbstractBase(object):
                 - FCELL;
                 - DCELL."""
         self.mapset = mapset
-        self.mtype = mtype.upper()
-        self.overwrite = overwrite
         #self.region = Region()
         self.cats = Category()
 
         self._name = name
-        ## Private attribute `_type` is the RASTER_TYPE of the map
-        self._mtype = mtype
         ## Private attribute `_fd` that return the file descriptor of the map
         self._fd = None
         ## Private attribute `_rows` that return the number of rows
@@ -112,9 +107,9 @@ class RasterAbstractBase(object):
         if mode.upper() not in ('R', 'W'):
             raise ValueError(_("Mode type: {0} not supported (\"r\", \"w\")".format(mode) ))
         self._mode = mode
-    
+
     mode = property(fget = _get_mode, fset = _set_mode)
-    
+
     def _get_overwrite(self):
         return self._overwrite
 
@@ -122,9 +117,9 @@ class RasterAbstractBase(object):
         if overwrite not in (True, False):
             raise ValueError(_("Overwrite type: {0} not supported (True/False)".format(overwrite) ))
         self._overwrite = overwrite
-    
+
     overwrite = property(fget = _get_overwrite, fset = _set_overwrite)
-    
+
     def _get_name(self):
         """Private method to return the Raster name"""
         return self._name
@@ -295,7 +290,9 @@ class RasterAbstractBase(object):
     def has_cats(self):
         """Return True if the raster map has categories"""
         if self.exist():
+            self.open()
             self.cats.read(self)
+            self.close()
             if len(self.cats) != 0:
                 return True
         return False
@@ -360,8 +357,7 @@ class RasterRow(RasterAbstractBase):
           object (only for rows), since r.mapcalc is more sophisticated and
           faster
     """
-    def __init__(self, name, mode = 'r', *args, **kargs):
-        self.mode = mode
+    def __init__(self, name, *args, **kargs):
         super(RasterRow, self).__init__(name, *args, **kargs)
 
 
@@ -407,7 +403,7 @@ class RasterRow(RasterAbstractBase):
         self.mode = mode
         self.mtype = mtype
         self.overwrite = overwrite
-        
+
         # check if exist and instantiate all the private attributes
         if self.exist():
             if self.mode == 'r':
@@ -501,9 +497,9 @@ class RasterSegment(RasterAbstractBase):
         if mode.upper() not in ('R', 'W', 'RW'):
             raise ValueError(_("Mode type: {0} not supported (\"r\", \"w\",\"rw\")".format(mode) ))
         self._mode = mode
-    
+
     mode = property(fget = _get_mode, fset = _set_mode)
-    
+
     def __setitem__(self, key, row):
         """Return the row of Raster object, slice allowed."""
         if isinstance( key, slice ) :
@@ -602,7 +598,7 @@ class RasterSegment(RasterAbstractBase):
         self.segment.val.value = val
         libseg.segment_put(ctypes.byref(self.segment.cseg),
                            ctypes.byref(self.segment.val), row, col)
-        
+
     def open(self, mode = 'r', mtype = 'DCELL', overwrite = False):
         """Open the map, if the map already exist: determine the map type
         and copy the map to the segment files;
@@ -621,15 +617,15 @@ class RasterSegment(RasterAbstractBase):
         # read rows and cols from the active region
         self._rows = libraster.Rast_window_rows()
         self._cols = libraster.Rast_window_cols()
-        
+
         self.overwrite = overwrite
         self.mode = mode
         self.mtype = mtype
-        
+
         if self.exist():
             if (self.mode == "w" or self.mode == "rw") and self.overwrite == False:
                 fatal(_("Raster map <{0}> already exists. Use overwrite flag to overwrite".format(self) ) )
-                
+
             # We copy the raster map content into the segments
             if self.mode == "rw" or self.mode == "r":
                 self._fd = libraster.Rast_open_old( self.name, self.mapset )
@@ -640,7 +636,7 @@ class RasterSegment(RasterAbstractBase):
                 self.segment.open(self)
                 self.map2segment()
                 self.segment.flush()
-            
+
                 if self.mode == "rw":
                     warning(_(WARN_OVERWRITE.format(self)))
                     # Close the file descriptor and open it as new again
@@ -655,7 +651,7 @@ class RasterSegment(RasterAbstractBase):
         else:
             if self.mode == "r":
                 fatal(_("Raster map <{0}> does not exists".format(self) ) )
-                
+
             self._gtype = RTYPE[self.mtype]['grass type']
             self.segment.open(self)
             self._fd = libraster.Rast_open_new( self.name, self._gtype )
@@ -755,8 +751,8 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
             self.mode = obj.mode
             self._rows = obj._rows
             self._cols = obj._cols
-            self._name = obj._name
-            self.mapset = obj.mapset
+            self._name = None
+            self.mapset = ''
             self.reg = obj.reg
             self.overwrite = obj.overwrite
             self.mtype = obj.mtype
@@ -771,9 +767,9 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         if mode.upper() not in ('R', 'W', "R+", "W+"):
             raise ValueError(_("Mode type: {0} not supported (\"r\", \"w\",\"r+\", \"w+\")".format(mode) ))
         self._mode = mode
-    
+
     mode = property(fget = _get_mode, fset = _set_mode)
-    
+
     def __array_wrap__(self, out_arr, context=None):
         """See:
         http://docs.scipy.org/doc/numpy/user/basics.subclassing.html#array-wrap-for-ufuncs"""
@@ -803,16 +799,14 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         @return 0 on success
         @return non-zero code on failure
         """
-        print "start export"
         self.null = None
-        
+
         size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
         kind = 'f' if kind == 'd' else kind
         ret = grasscore.run_command('r.out.bin', flags = kind,
                                      input = self._name, output = self.filename,
                                      bytes = size, null = self.null,
                                      quiet = True)
-        print "end export"
         return ret
 
     def _write(self):
@@ -827,11 +821,11 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
             size = 4
         else: kind
         size = None if kind == 'f' else size
-        
+
         # To be set in the future
         self.title = None
         self.null = None
-        
+
         if self.overwrite == True and (self.mode == "w" or self.mode == "w+"):
             print "start import"
             ret = grasscore.run_command('r.in.bin', flags = kind,
@@ -859,7 +853,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         mtype: string, optional
             Specify the map type, valid only for new maps: CELL, FCELL, DCELL;
         """
-        
+
         self.null = null
         # rows and cols already set in __new__
         if self.exist():
