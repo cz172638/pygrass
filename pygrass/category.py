@@ -11,6 +11,7 @@ import grass.lib.segment as libseg
 from raster_type import TYPE as RTYPE
 import ctypes
 import numpy as np
+from operator import itemgetter
 
 #GET_ITH_CAT = {
 #    'CELL' : libraster.Rast_get_ith_c_cat,
@@ -27,7 +28,7 @@ import numpy as np
 
 
 
-class Category(object):
+class Category(list):
     """
     I would like to add the following functions:
 
@@ -76,11 +77,12 @@ class Category(object):
     >>> max_cat = ctypes.c_void_p()
     >>> libraster.Rast_get_ith_c_cat(ctypes.byref(cats.cats), 0, min_cat, max_cat)
     """
-    def __init__(self, mtype = None):
-        self.cats = libraster.Categories()
-        libraster.Rast_init_cats("", ctypes.byref(self.cats))
+    def __init__(self, mtype = None, *args, **kargs):
+        self._cats = libraster.Categories()
+        libraster.Rast_init_cats("", ctypes.byref(self._cats))
         self._mtype = mtype
         self._gtype = None if mtype == None else RTYPE[mtype]['grass type']
+        super(Category, self).__init__(*args, **kargs)
 
     def _get_mtype(self):
         return self._mtype
@@ -95,10 +97,10 @@ class Category(object):
     mtype = property(fget = _get_mtype, fset = _set_mtype)
 
     def _get_title(self):
-        return libraster.Rast_get_cats_title(ctypes.byref(self.cats))
+        return libraster.Rast_get_cats_title(ctypes.byref(self._cats))
 
     def _set_title(self, newtitle):
-        return libraster.Rast_set_cats_title(newtitle, ctypes.byref(self.cats))
+        return libraster.Rast_set_cats_title(newtitle, ctypes.byref(self._cats))
 
     title = property(fget = _get_title, fset = _set_title)
 
@@ -124,47 +126,49 @@ class Category(object):
             cats.append(repr(cat))
         return "[{0}]".format(',\n '.join(cats))
 
-    def __len__(self):
-        return libraster.Rast_number_of_cats(ctypes.byref(self.cats))
 
-    def __getitem__(self, index):
-        """Returns i-th description and i-th data range from the list of
-        category descriptions with corresponding data ranges. end points of
-        data interval.
-
-        Rast_get_ith_cat(const struct Categories * 	pcats,
-                         int 	i,
-                         void * 	rast1,
-                         void * 	rast2,
-                         RASTER_MAP_TYPE 	data_type
-                         )
-        """
-        return self.get_cat(index)
-
-
-    def __iter__(self):
-        return (self.__getitem__(i) for i in xrange(self.cats.ncats) )
-
-    def get_cat(self, index):
-        """Returns i-th description and i-th data range from the list of
-        category descriptions with corresponding data ranges. end points of
-        data interval.
-
-        Rast_get_ith_cat(const struct Categories * 	pcats,
-                         int 	i,
-                         void * 	rast1,
-                         void * 	rast2,
-                         RASTER_MAP_TYPE 	data_type
-                         )
-        """
+    def _chk_index(self, index):
         if type(index) == str:
             try:
                 index = self.labels().index(index)
             except ValueError:
                 raise KeyError(index)
+        return index
+
+    def _chk_value(self, value):
+        if type(value) == tuple:
+            length = len(value)
+            if length == 2:
+                label, min_cat = value
+                value = (label, min_cat, None)
+            elif length < 2 or length > 3:
+                raise TypeError('Tuple with a length that is not supported.')
+        else:
+            raise TypeError('Only Tuple are supported.')
+        return value
+
+    def __getitem__(self, index):
+        return super(Category, self).__getitem__(self._chk_index(index))
+
+    def __setitem__(self, index, value):
+        return super(Category, self).__setitem__(self._chk_index(index),
+                                                 self._chk_value(value))
+
+    def _get_c_cat(self, index):
+        """Returns i-th description and i-th data range from the list of
+        category descriptions with corresponding data ranges. end points of
+        data interval.
+
+        Rast_get_ith_cat(const struct Categories * 	pcats,
+                         int 	i,
+                         void * 	rast1,
+                         void * 	rast2,
+                         RASTER_MAP_TYPE 	data_type
+                         )
+        """
         min_cat = ctypes.pointer(RTYPE[self.mtype]['grass def']() )
         max_cat = ctypes.pointer(RTYPE[self.mtype]['grass def']() )
-        lab = libraster.Rast_get_ith_cat(ctypes.byref(self.cats),
+        lab = libraster.Rast_get_ith_cat(ctypes.byref(self._cats),
                                          index,
                                          ctypes.cast(min_cat, ctypes.c_void_p),
                                          ctypes.cast(max_cat, ctypes.c_void_p),
@@ -177,7 +181,7 @@ class Category(object):
             max_cat = max_cat.contents.value
         return lab, min_cat.contents.value, max_cat
 
-    def set_cat(self, label, min_cat, max_cat = None):
+    def _set_c_cat(self, label, min_cat, max_cat = None):
         """Adds the label for range min through max in category structure cats.
 
         int Rast_set_cat(const void * 	rast1,
@@ -193,14 +197,46 @@ class Category(object):
         err = libraster.Rast_set_cat(ctypes.cast(min_cat, ctypes.c_void_p),
                                      ctypes.cast(max_cat, ctypes.c_void_p),
                                      label,
-                                     ctypes.byref(self.cats), self._gtype)
+                                     ctypes.byref(self._cats), self._gtype)
         # Manage C function Errors
         if err == 1: return None
         elif err == 0: print(_("Null value detected")); raise
         elif err == -1: print(_("Error executing: Rast_set_cat")); raise
 
     def __del__(self):
-        libraster.Rast_free_cats(ctypes.byref(self.cats))
+        libraster.Rast_free_cats(ctypes.byref(self._cats))
+
+    def get_cat(self, index):
+        return self.__getitem__(index)
+
+    def set_cat(self, index, value):
+        if index == None:
+            self.append(value)
+        elif index < self.__len__():
+            self.__setitem__(index, value)
+        else:
+            raise TypeError("Index outside range.")
+
+    def reset(self):
+        for i in xrange(len(self)-1, -1, -1 ):
+            del(self[i])
+        libraster.Rast_init_cats("", ctypes.byref(self._cats))
+
+    def _read_cats(self):
+        """Copy from the C struct to the list"""
+        for i in xrange(self._cats.ncats):
+            self.append(self._get_c_cat(i))
+
+    def _write_cats(self):
+        """Copy from the list data to the C struct"""
+        # reset only the C struct
+        libraster.Rast_init_cats("", ctypes.byref(self._cats))
+        # write to the c struct
+        for cat in self.__iter__():
+            label, min_cat, max_cat = cat
+            if max_cat == None:
+                max_cat = min_cat
+            self._set_c_cat(label, min_cat, max_cat)
 
     def read(self, map, mapset = None, mtype = None):
         """Read categories from a raster map
@@ -224,9 +260,12 @@ class Category(object):
             mtype = map.mtype
 
         self.mtype = mtype
+        self.reset()
         err = libraster.Rast_read_cats(mapname, mapset,
-                                       ctypes.byref(self.cats))
+                                       ctypes.byref(self._cats))
         if err == -1: raise
+        # copy from C struct to list
+        self._read_cats()
 
 
     def write(self, map):
@@ -241,17 +280,30 @@ class Category(object):
             mapname = map
         else:
             mapname = map.name
-        libraster.Rast_write_cats(mapname, ctypes.byref(self.cats))
+        # copy from list to C struct
+        self._write_cats()
+        # write to the map
+        libraster.Rast_write_cats(mapname, ctypes.byref(self._cats))
 
     def copy(self, category):
         """Copy from another Category class"""
-        libraster.Rast_copy_cats(ctypes.byref(self.cats),     # to
-                                 ctypes.byref(category.cats)) # from
+        libraster.Rast_copy_cats(ctypes.byref(self._cats),     # to
+                                 ctypes.byref(category._cats)) # from
+        self._read_cats()
 
     def ncats(self):
         return self.__len__()
 
-    def set_cats_fmt(self, fmt):
+    def set_cats_fmt(self, fmt, m1, a1, m2, a2):
+        """
+        void Rast_set_cats_fmt(const char *fmt,
+                               double m1,
+                               double a1,
+                               double m2,
+                               double a2,
+                               struct Categories *pcats)
+        """
+        #libraster.Rast_set_cats_fmt()
         pass
 
     def read_rules(self, filename, sep = ':'):
@@ -265,21 +317,19 @@ class Category(object):
         0.:0.5:forest
         0.5:1.0:road
         1.0:1.5:urban"""
+        self.reset()
         with open(filename, 'r') as f:
             for row in f.readlines():
                 cat = row.strip().split(sep)
                 if len(cat) == 2:
                     label, min_cat = cat
-                    max_cat = min_cat
+                    max_cat = None
                 elif len(cat) == 3:
                     label, min_cat, max_cat = cat
                 else:
                     raise TypeError("Row lenght is greater than 3")
                 #import pdb; pdb.set_trace()
-                self.set_cat(label,
-                             # convert string into int32, float32 or float64
-                             RTYPE[self.mtype]['numpy'](min_cat),
-                             RTYPE[self.mtype]['numpy'](max_cat))
+                self.append((label,min_cat, max_cat))
 
     def write_rules(self, filename, sep = ':'):
         """Copy categories from a rules file, default separetor is ':', the
@@ -302,13 +352,9 @@ class Category(object):
 
 
     def sort(self):
-        libraster.Rast_sort_cats(ctypes.byref(self.cats))
+        libraster.Rast_sort_cats(ctypes.byref(self._cats))
 
 
     def labels(self):
-        labels = []
-        for i in range(self.cats.ncats):
-            labels.append(ctypes.cast(self.cats.labels[i],
-                                      ctypes.c_char_p).value)
-        return labels
+        return map(itemgetter(0), self)
 
