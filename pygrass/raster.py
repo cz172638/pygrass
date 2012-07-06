@@ -644,7 +644,7 @@ class RasterSegment(RasterAbstractBase):
                     self._fd = libraster.Rast_open_new( self.name, self._gtype )
             # Here we simply overwrite the existing map without content copying
             elif self.mode == "w":
-                warning(_(WARN_OVERWRITE.format(self)))
+                #warning(_(WARN_OVERWRITE.format(self)))
                 self._gtype = RTYPE[self.mtype]['grass type']
                 self.segment.open(self)
                 self._fd = libraster.Rast_open_new( self.name, self._gtype )
@@ -782,7 +782,8 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
 
     def __init__(self, name, *args, **kargs):
         ## Private attribute `_fd` that return the file descriptor of the map
-        self._fd = None
+        #self._fd = None
+        RasterAbstractBase.__init__(self, name)
 
     def _get_flags(self, size, kind):
         if FLAGS.has_key(size):
@@ -827,7 +828,6 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         self.null = None
 
         if self.overwrite == True and (self.mode == "w" or self.mode == "w+"):
-            print "start import"
             ret = grasscore.run_command('r.in.bin', flags = kind,
                                          input = self.filename, output = self._name,
                                          title = self.title, bytes = size,
@@ -839,7 +839,6 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
                                          west  = self.reg.west,
                                          rows  = self.reg.rows,
                                          cols  = self.reg.cols)
-            print "end import"
             return ret
 
     def open(self, mtype = '', null = None):
