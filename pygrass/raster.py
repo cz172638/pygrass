@@ -783,7 +783,9 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
     def __init__(self, name, *args, **kargs):
         ## Private attribute `_fd` that return the file descriptor of the map
         #self._fd = None
+        rows, cols = self.rows, self.cols
         RasterAbstractBase.__init__(self, name)
+        self._rows, self._cols = rows, cols
 
     def _get_flags(self, size, kind):
         if FLAGS.has_key(size):
