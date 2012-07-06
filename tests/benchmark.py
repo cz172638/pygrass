@@ -2,20 +2,438 @@
 """
 Created on Sat Jun 16 20:24:56 2012
 
-@author: pietro
+@author: soeren
 """
-import numpy as np
-import timeit
-import collections
-import sys, os
-
 import optparse
-
+#import numpy as np
+import time
+import collections
+import copy
+import sys, os
+from jinja2 import Template
 sys.path.append(os.getcwd())
+sys.path.append("%s/.."%(os.getcwd()))
 
-from grass.script import core as grasscore
+import grass.lib.gis as libgis
+import grass.lib.raster as libraster
+import grass.script as core
 import pygrass
-#from grass.script.core import run_command, use_temp_region, del_temp_region
+import ctypes
+
+def test__RasterNumpy_value_access__if():
+    test_a = pygrass.RasterNumpy(name="test_a", mtype="CELL", mode="r+")
+    test_a.open()
+
+    test_c = pygrass.RasterNumpy(name="test_c", mtype="CELL", mode="w+", overwrite=True)
+    test_c.open()
+
+    for row in xrange(test_a.rows):
+        for col in xrange(test_a.cols):
+            test_c[row, col] = test_a[row, col] > 50
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterNumpy_value_access__add():
+    test_a = pygrass.RasterNumpy(name="test_a", mode="r+")
+    test_a.open()
+
+    test_b = pygrass.RasterNumpy(name="test_b", mode="r+")
+    test_b.open()
+
+    test_c = pygrass.RasterNumpy(name="test_c", mtype="DCELL", mode="w+", overwrite=True)
+    test_c.open()
+
+    for row in xrange(test_a.rows):
+        for col in xrange(test_a.cols):
+            test_c[row, col] = test_a[row, col] + test_b[row, col]
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterNumpy_row_access__if():
+    test_a = pygrass.RasterNumpy(name="test_a", mtype="CELL", mode="r+")
+    test_a.open()
+
+    test_c = pygrass.RasterNumpy(name="test_c", mtype="CELL", mode="w+", overwrite=True)
+    test_c.open()
+
+    for row in xrange(test_a.rows):
+        test_c[row] = test_a[row] > 50
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterNumpy_row_access__add():
+    test_a = pygrass.RasterNumpy(name="test_a", mode="r+")
+    test_a.open()
+
+    test_b = pygrass.RasterNumpy(name="test_b", mode="r+")
+    test_b.open()
+
+    test_c = pygrass.RasterNumpy(name="test_c", mtype="DCELL", mode="w+", overwrite=True)
+    test_c.open()
+
+    for row in xrange(test_a.rows):
+        test_c[row] = test_a[row] + test_b[row]
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterNumpy_map_access__if():
+    test_a = pygrass.RasterNumpy(name="test_a", mtype="CELL", mode="r+")
+    test_a.open()
+
+    test_c = pygrass.RasterNumpy(name="test_c", mtype="CELL", mode="w+", overwrite=True)
+    test_c.open()
+
+    test_c = test_a > 50
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterNumpy_map_access__add():
+    test_a = pygrass.RasterNumpy(name="test_a", mode="r+")
+    test_a.open()
+
+    test_b = pygrass.RasterNumpy(name="test_b", mode="r+")
+    test_b.open()
+
+    test_c = pygrass.RasterNumpy(name="test_c", mtype="DCELL", mode="w+", overwrite=True)
+    test_c.open()
+
+    test_c = test_a + test_b
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterSegment_value_access__if():
+    test_a = pygrass.RasterSegment(name="test_a")
+    test_a.open(mode="r")
+
+    test_c = pygrass.RasterSegment(name="test_c")
+    test_c.open(mode="w", mtype="CELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        for col in xrange(test_a.cols):
+            test_c.put(row, col, buff_a[col] > 50)
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterSegment_value_access__add():
+    test_a = pygrass.RasterSegment(name="test_a")
+    test_a.open(mode="r")
+
+    test_b = pygrass.RasterSegment(name="test_b")
+    test_b.open(mode="r")
+
+    test_c = pygrass.RasterSegment(name="test_c")
+    test_c.open(mode="w", mtype="DCELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+    buff_b = pygrass.Buffer(test_b.cols, test_b.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_b.get_row(row,buff_b)
+        for col in xrange(test_a.cols):
+            test_c.put(row, col, buff_a[col] + buff_b[col])
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterSegment_row_access__if():
+    test_a = pygrass.RasterSegment(name="test_a")
+    test_a.open(mode="r")
+
+    test_c = pygrass.RasterSegment(name="test_c")
+    test_c.open(mode="w", mtype="CELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_c.put_row(row, buff_a > 50)
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterSegment_row_access__add():
+    test_a = pygrass.RasterSegment(name="test_a")
+    test_a.open(mode="r")
+
+    test_b = pygrass.RasterSegment(name="test_b")
+    test_b.open(mode="r")
+
+    test_c = pygrass.RasterSegment(name="test_c")
+    test_c.open(mode="w", mtype="DCELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+    buff_b = pygrass.Buffer(test_b.cols, test_b.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_b.get_row(row,buff_b)
+        test_c.put_row(row, buff_a + buff_b)
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterRow_value_access__add():
+    test_a = pygrass.RasterRow(name="test_a")
+    test_a.open(mode="r")
+
+    test_b = pygrass.RasterRow(name="test_b")
+    test_b.open(mode="r")
+
+    test_c = pygrass.RasterRow(name="test_c")
+    test_c.open(mode="w", mtype="FCELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+    buff_b = pygrass.Buffer(test_b.cols, test_b.mtype)
+    buff_c = pygrass.Buffer(test_b.cols, test_b.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_b.get_row(row,buff_b)
+
+        for col in xrange(test_a.cols):
+            buff_c[col] = buff_a[col] + buff_b[col]
+
+        test_c.put_row(buff_c)
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterRow_value_access__if():
+    test_a = pygrass.RasterRow(name="test_a")
+    test_a.open(mode="r")
+
+    test_c = pygrass.RasterRow(name="test_c")
+    test_c.open(mode="w", mtype="CELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+    buff_c = pygrass.Buffer(test_a.cols, test_a.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+
+        for col in xrange(test_a.cols):
+            buff_c[col] = buff_a[col] > 50
+
+        test_c.put_row(buff_c)
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterRowIO_row_access__add():
+    test_a = pygrass.RasterRowIO(name="test_a")
+    test_a.open(mode="r")
+
+    test_b = pygrass.RasterRowIO(name="test_b")
+    test_b.open(mode="r")
+
+    test_c = pygrass.RasterRowIO(name="test_c")
+    test_c.open(mode="w", mtype="FCELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+    buff_b = pygrass.Buffer(test_b.cols, test_b.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_b.get_row(row,buff_b)
+        test_c.put_row(buff_a + buff_b)
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterRowIO_row_access__if():
+    test_a = pygrass.RasterRowIO(name="test_a")
+    test_a.open(mode="r")
+
+    test_c = pygrass.RasterRowIO(name="test_c")
+    test_c.open(mode="w", mtype="CELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_c.put_row(buff_a > 50)
+
+    test_a.close()
+    test_c.close()
+
+def test__RasterRow_row_access__add():
+    test_a = pygrass.RasterRow(name="test_a")
+    test_a.open(mode="r")
+
+    test_b = pygrass.RasterRow(name="test_b")
+    test_b.open(mode="r")
+
+    test_c = pygrass.RasterRow(name="test_c")
+    test_c.open(mode="w", mtype="FCELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+    buff_b = pygrass.Buffer(test_b.cols, test_b.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_b.get_row(row,buff_b)
+        test_c.put_row(buff_a + buff_b)
+
+    test_a.close()
+    test_b.close()
+    test_c.close()
+
+def test__RasterRow_row_access__if():
+    test_a = pygrass.RasterRow(name="test_a")
+    test_a.open(mode="r")
+
+    test_c = pygrass.RasterRow(name="test_c")
+    test_c.open(mode="w", mtype="CELL", overwrite=True)
+
+    buff_a = pygrass.Buffer(test_a.cols, test_a.mtype)
+
+    for row in xrange(test_a.rows):
+        test_a.get_row(row, buff_a)
+        test_c.put_row(buff_a > 50)
+
+    test_a.close()
+    test_c.close()
+
+#def test__mapcalc__add():
+#    core.mapcalc("test_c = test_a + test_b", quite=True, overwrite=True)
+#
+#def test__mapcalc__if():
+#    core.mapcalc("test_c = if(test_a > 50, 1, 0)", quite=True, overwrite=True)
+
+def mytimer(func, runs=1):
+    times = []
+    t = 0.0
+    for _ in xrange(runs):
+        start = time.time()
+        func()
+        end = time.time()
+        times.append(end - start)
+        t = t + end - start
+
+    return t/runs, times
+
+
+
+def run_benchmark(resolution_list, runs, testdict):
+    regions = []
+    for resolution in resolution_list:
+        core.use_temp_region()
+        core.run_command('g.region', e=50, w=-50, n=50, s=-50, res=resolution, flags='p')
+
+        # Adjust the computational region for this process
+        region = libgis.Cell_head()
+        libraster.Rast_get_window(ctypes.byref(region))
+        region.e = 50
+        region.w = -50
+        region.n = 50
+        region.s = -50
+        region.ew_res = resolution
+        region.ns_res = resolution
+
+        libgis.G_adjust_Cell_head(ctypes.byref(region), 0, 0)
+
+        libraster.Rast_set_window(ctypes.byref(region))
+        libgis.G_set_window(ctypes.byref(region))
+
+        # Create two raster maps with random numbers
+        core.mapcalc("test_a = rand(0, 100)", quite=True, overwrite=True)
+        core.mapcalc("test_b = rand(0.0, 1.0)", quite=True, overwrite=True)
+        result = collections.OrderedDict()
+        result['res'] = resolution
+        result['cols'] = region.cols
+        result['rows'] = region.rows
+        result['cells'] = region.rows * region.cols
+        result['results'] = copy.deepcopy(testdict)
+        for execmode, operation in result['results'].iteritems():
+            print(execmode)
+            for oper, operdict in operation.iteritems():
+                operdict['time'], operdict['times'] = mytimer(operdict['func'],runs)
+                print('    {0}: {1: 40.6f}s'.format(oper, operdict['time']))
+                del(operdict['func'])
+
+        regions.append(result)
+        core.del_temp_region()
+
+    return regions
+
+def get_testlist(loc):
+    testlist = [test for test in loc.keys() if 'test' in test[:5]]
+    testlist.sort()
+    return testlist
+
+def get_testdict(testlist):
+    testdict = collections.OrderedDict()
+    for testfunc in testlist:
+        #import pdb; pdb.set_trace()
+        dummy, execmode, operation = testfunc.split('__')
+        if execmode in testdict.keys():
+            testdict[execmode][operation] = collections.OrderedDict()
+            testdict[execmode][operation]['func'] = loc[testfunc]
+        else:
+            testdict[execmode] = collections.OrderedDict()
+            testdict[execmode][operation] = collections.OrderedDict()
+            testdict[execmode][operation]['func'] = loc[testfunc]
+    return testdict
+
+def print_test(testdict):
+    for execmode, operation in testdict.iteritems():
+        print execmode
+        for oper, operdict in operation.iteritems():
+            print '    ', oper
+            for key, value in operdict.iteritems():
+                print '        ', key
+
+TXT = u"""
+{% for region in regions %}
+{{ '#'*60 }}
+### Benchmark cols = {{ region.cols }} rows = {{ region.rows}} cells = {{ region.cells }}
+{{ '#'*60 }}
+
+    # equation: c = a + b
+    {% for execmode, operation in region.results.iteritems() %}
+        {{ "%-30s - %5s % 12.6fs"|format(execmode, 'add', operation.add.time) }}
+    {%- endfor %}
+
+    # equation: c = if a > 50 then 1 else 0
+    {% for execmode, operation in region.results.iteritems() %}
+        {{ "%-30s - %5s % 12.6fs"|format(execmode, 'if', operation.if.time) }}
+    {%- endfor %}
+{%- endfor %}
+"""
+
+
+CSV = """Class; Mode; Operation;
+
+"""
+
+RST = """
+"""
+#>>> txt = Template(TxT)
+#>>> txt.render(name='John Doe')
+
+
+def get_txt(results):
+    txt = Template(TXT)
+    return txt.render(regions = results)
+
 
 #classes for required options
 strREQUIRED = 'required'
@@ -37,167 +455,61 @@ class OptionParser(optparse.OptionParser):
         for option in self.option_list:
             if hasattr(option, strREQUIRED) and option.required:
                 if not getattr(values, option.dest):
-                    self.error("option %s is required" % (str(option)))
+                    self.error("option %s is required".format(str(option)))
         return optparse.OptionParser.check_values(self, values, args)
 
-def run_benchmark(tests, ntimes):
-    result = collections.OrderedDict()
-    for key, val in tests.iteritems():
-        result[key] = {}
-        result[key]['timer'] = val
-        result[key]['exec time'] = val.timeit( number=ntimes )
-        print("{0}; {1:f}; sec/pass".format(key, result[key]['exec time']))
-    return result
 
-def print_benchmark(result):
-    for key, val in result.iteritems():
-        print("{0}; {1:f}; sec/pass".format(key, result[key]['exec time']))
-
-def main():
+def main(testdict):
     """Main function"""
     #usage
     usage = "usage: %prog [options] raster_map"
     parser = OptionParser(usage=usage)
-    #password
-    parser.add_option("-n", "--ntimes", dest="ntim",
-                      help="number of run for each test")
-    #username
-    parser.add_option("-U", "--username", dest="user", default = "anonymous",
-                      help="username for connect to ftp server")
+    # ntime
+    parser.add_option("-n", "--ntimes", dest="ntime",default=5, type="int",
+                      help="Number of run for each test.")
+    # res
+    parser.add_option("-r", "--resolution", action="store", type="string",
+                      dest="res", default = '1,0.25',
+                      help="Resolution list separete by comma.")
+    # fmt
+    parser.add_option("-f", "--fmt", action="store", type="string",
+                      dest="fmt", default = 'txt',
+                      help="Choose the output format: 'txt', 'csv', 'rst'.")
 
-    #random
-    parser.add_option("-r", action="store_true", dest="rand",
-                      help="If true generate a random map")
+    # output
+    parser.add_option("-o", "--output", action="store", type="string",
+                      dest="output", help="The output filename.")
 
+    # store
+    parser.add_option("-s", "--store", action="store", type="string",
+                      dest="store", help="The filename of pickle obj.")
 
     #return options and argument
-    (options, args) = parser.parse_args()
-    #test if args[0] it is set
-    if len(args) == 0:
-        parser.error("You have to pass a raster map")
-    elif len(args) > 1:
-        parser.error("You have to pass only a map")
+    options, args = parser.parse_args()
+    res = [float(r) for r in options.res.split(',')]
+    #res = [1, 0.25, 0.1, 0.05]
 
-    raster_name = args[0]
+    results = run_benchmark(res, options.ntime, testdict)
 
-    if options.rand:
-        # generate the random map
-        pygrass.raster.random_map_only_columns(raster_name, 'DCELL')
-
-    grasscore.use_temp_region()
-
-    grasscore.run_command('g.region', rast=raster_name, flags='p')
-
-    print("Compare r.mapcalc and pygrass classes")
+    if options.store:
+        import pickle
+        output = open(options.store, 'wb')
+        pickle.dump(results, output)
+        output.close()
+    #import pdb; pdb.set_trace()
+    print get_txt(results)
 
 
-    rmapcalc_SETUP = "from grass.script.core import run_command"
-
-    pygrass_SETUP = """import pygrass
-import numpy as np
-raster = pygrass.RasterRow('{0}', 'r')
-raster.open()""".format(raster_name)
-
-    pygrass_numpy_SETUP = """import pygrass
-import numpy as np
-raster = pygrass.RasterNumpy('{0}', overwrite = True)
-raster.open()""".format(raster_name)
-
-    TEST = collections.OrderedDict( [
-
-    #
-    # map += 2
-    #
-    ('r.mapcalc +2', timeit.Timer(stmt = """
-    run_command('r.mapcalc', expression = 'new = %s + 2', overwrite = True)
-    """ % raster_name, setup = rmapcalc_SETUP) ),
-
-    ('RasterRow +2', timeit.Timer(stmt = """
-    new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
-    new.open(overwrite = True)
-    for row in raster: new.put_row( row + 2)
-    new.close()
-    """, setup = pygrass_SETUP)),
-
-    ('RasterSeg +2', timeit.Timer(stmt = """
-    new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
-    new.open()
-    for irow, row in enumerate(raster): new.put_row(irow, row + 2)
-    new.close()
-    """, setup = pygrass_SETUP)),
-
-    ('RasterNumpy +2', timeit.Timer(stmt = """
-    el = raster + 2
-    el.overwrite=True
-    el.rename('new')
-    el.close()
-    """, setup = pygrass_numpy_SETUP)),
-
-    #
-    # 1 if map < 0 else 0
-    #
-
-    ('r.mapcalc if', timeit.Timer(stmt = """
-    run_command('r.mapcalc', expression = 'new = if(%s < 50, 1, 0)', overwrite = True)
-    """ % raster_name, setup = rmapcalc_SETUP) ),
-
-    ('RasterRow if', timeit.Timer(stmt = """
-    new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
-    new.open(overwrite = True)
-    for row in raster: new.put_row( row < 50)
-    new.close()
-    """, setup = pygrass_SETUP)),
-
-    ('RasterSeg if', timeit.Timer(stmt = """
-    new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
-    new.open()
-    for irow, row in enumerate(raster): new.put_row(irow, row < 50)
-    new.close()
-    """, setup = pygrass_SETUP)),
-
-    ('RasterNumpy if', timeit.Timer(stmt = """
-    el = raster < 50
-    el.overwrite=True
-    el.rename("newif")
-    el.close()""", setup = pygrass_numpy_SETUP)),
-
-    #
-    # sqrt
-    #
-
-    ('r.mapcalc sqrt', timeit.Timer(stmt = """
-    run_command('r.mapcalc', expression = 'new = sqrt(%s)', overwrite = True)
-    """ % raster_name, setup = rmapcalc_SETUP) ),
-
-    ('RasterRow sqrt', timeit.Timer(stmt = """
-    new = pygrass.RasterRow('new', mtype = 'DCELL', mode = 'w', overwrite = True)
-    new.open(overwrite = True)
-    for row in raster: new.put_row(np.sqrt(row))
-    new.close()
-    """, setup = pygrass_SETUP)),
-
-    ('RasterSeg sqrt', timeit.Timer(stmt = """
-    new = pygrass.RasterSegment('new', mtype = 'DCELL', overwrite = True)
-    new.open()
-    for irow, row in enumerate(raster): new.put_row(irow, np.sqrt(row))
-    new.close()
-    """, setup = pygrass_SETUP)),
-
-    ('RasterNumpy sqrt', timeit.Timer(stmt = """
-    el = np.sqrt(raster)
-    el.overwrite=True
-    el.rename('new')
-    el.close()
-    """, setup = pygrass_numpy_SETUP)),
-
-    ])
-
-    result = run_benchmark(TEST, ntimes = int(options.ntim))
-    print
-    print('=' * 50)
-    print
-    print_benchmark(result)
-    grasscore.del_temp_region()
 #add options
 if __name__ == "__main__":
-    main()
+    #import pdb; pdb.set_trace()
+    loc = locals()
+    testlist = get_testlist(loc)
+    testdict = get_testdict(testlist)
+    #print_test(testdict)
+
+
+
+    #import pdb; pdb.set_trace()
+
+    main(testdict)
