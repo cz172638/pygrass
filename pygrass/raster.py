@@ -843,7 +843,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
                                          cols  = self.reg.cols)
             return ret
 
-    def open(self, mtype = '', null = None):
+    def open(self, mtype = '', null = None, overwrite = None):
         """Open the map, if the map already exist: determine the map type
         and copy the map to the segment files;
         else, open a new segment map.
@@ -854,7 +854,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         mtype: string, optional
             Specify the map type, valid only for new maps: CELL, FCELL, DCELL;
         """
-
+        if overwrite != None: self.overwrite = overwrite
         self.null = null
         # rows and cols already set in __new__
         if self.exist():
@@ -875,10 +875,10 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
 
 def random_map_only_columns(mapname, mtype, overwrite = True, factor = 100):
     region = Region()
-    random_map = RasterRow(mapname, mtype, overwrite = overwrite)
+    random_map = RasterRow(mapname)
     row_buf = Buffer((region.cols, ), mtype,
                          buffer = (np.random.random(region.cols,)*factor).data )
-    random_map.open(mode = 'w')
+    random_map.open('w', mtype, overwrite)
     for _ in xrange(region.rows):
         random_map.put_row(row_buf)
     random_map.close()
@@ -886,8 +886,8 @@ def random_map_only_columns(mapname, mtype, overwrite = True, factor = 100):
 
 def random_map(mapname, mtype, overwrite = True, factor = 100):
     region = Region()
-    random_map = RasterRow(mapname, mtype, overwrite = overwrite)
-    random_map.open(mode = 'w')
+    random_map = RasterRow(mapname)
+    random_map.open('w', mtype, overwrite)
     for _ in xrange(region.rows):
         row_buf = Buffer((region.cols, ), mtype,
                          buffer = (np.random.random(region.cols,)*factor).data )

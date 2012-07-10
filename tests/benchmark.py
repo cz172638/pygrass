@@ -9,6 +9,7 @@ import optparse
 import time
 import collections
 import copy
+import cProfile
 import sys, os
 from jinja2 import Template
 sys.path.append(os.getcwd())
@@ -312,11 +313,11 @@ def test__RasterRow_row_access__if():
     test_a.close()
     test_c.close()
 
-#def test__mapcalc__add():
-#    core.mapcalc("test_c = test_a + test_b", quite=True, overwrite=True)
-#
-#def test__mapcalc__if():
-#    core.mapcalc("test_c = if(test_a > 50, 1, 0)", quite=True, overwrite=True)
+def test__mapcalc__add():
+    core.mapcalc("test_c = test_a + test_b", quite=True, overwrite=True)
+
+def test__mapcalc__if():
+    core.mapcalc("test_c = if(test_a > 50, 1, 0)", quite=True, overwrite=True)
 
 def mytimer(func, runs=1):
     times = []
@@ -332,7 +333,7 @@ def mytimer(func, runs=1):
 
 
 
-def run_benchmark(resolution_list, runs, testdict):
+def run_benchmark(resolution_list, runs, testdict, profile):
     regions = []
     for resolution in resolution_list:
         core.use_temp_region()
@@ -366,6 +367,10 @@ def run_benchmark(resolution_list, runs, testdict):
             print(execmode)
             for oper, operdict in operation.iteritems():
                 operdict['time'], operdict['times'] = mytimer(operdict['func'],runs)
+                if profile:
+                    filename = '{}_{}_{}'.format(execmode, oper, profile)
+                    cProfile.runctx(operdict['func'].__name__ + '()',
+                                    globals(), locals(), filename = filename)
                 print('    {0}: {1: 40.6f}s'.format(oper, operdict['time']))
                 del(operdict['func'])
 
@@ -484,12 +489,16 @@ def main(testdict):
     parser.add_option("-s", "--store", action="store", type="string",
                       dest="store", help="The filename of pickle obj.")
 
+    # profile
+    parser.add_option("-p", "--profile", action="store", type="string",
+                      dest="profile", help="The filename of the profile results.")
+
     #return options and argument
     options, args = parser.parse_args()
     res = [float(r) for r in options.res.split(',')]
     #res = [1, 0.25, 0.1, 0.05]
 
-    results = run_benchmark(res, options.ntime, testdict)
+    results = run_benchmark(res, options.ntime, testdict, options.profile)
 
     if options.store:
         import pickle
