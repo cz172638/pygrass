@@ -6,7 +6,7 @@ Created on Fri May 25 12:56:33 2012
 """
 
 import ctypes
-from grass.script import fatal, warning#, message
+from grass.script import fatal, warning, gisenv#, message
 from grass.script import core as grasscore
 #from grass.script import core
 #import grass.lib as grasslib
@@ -254,7 +254,9 @@ class RasterAbstractBase(object):
             self.exist()
             mapset = self.mapset
 
-        if mapset:
+        gis_env = gisenv()
+
+        if mapset and mapset != gis_env['MAPSET']:
             return "{name}@{mapset}".format(name = name, mapset = mapset)
         else:
             return name
@@ -786,6 +788,12 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         rows, cols = self.rows, self.cols
         RasterAbstractBase.__init__(self, name)
         self._rows, self._cols = rows, cols
+
+    def __unicode__(self):
+        return RasterAbstractBase.__unicode__(self)
+
+    def __str__(self):
+        return self.__unicode__()
 
     def _get_flags(self, size, kind):
         if FLAGS.has_key(size):
