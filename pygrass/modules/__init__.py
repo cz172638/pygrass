@@ -1,162 +1,70 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jul  7 19:50:00 2012
+Created on Thu Jul 12 10:23:15 2012
 
 @author: pietro
+
+
+Example:
+import grass.modules as modules
+
+1) Running r.slope.aspect
+rsa = modules.factory("r.slope.aspect", elevation=elev, slope='slp_f',
+...                           format='percent', overwrite=True)
+
+2) Creating a run-able module object and run later
+rsa = modules.factory("r.slope.aspect", elevation='elev', slope='slp_f',
+...                           format='percent', flags='g',
+overwrite=True, run=False)
+rsa.run()
+# or for cluster environments of wps server
+rsa.remote_run(node="cluster_node_3")
+
+3) Creating a module object and run later with arguments
+rsa = modules.factory("r.slope.aspect")
+rsa.run(elevation='elev', slope='slp_f', format='percent', flags='g',
+overwrite=True)
+
+4) Create the module object input step by step and run later
+rsa = modules.factory("r.slope.aspect")
+rsa.inputs["elevation"] = "elev"
+rsa.inputs["format"] = 'percent'
+rsa.outputs["slope"] = "slp_f"
+rsa.flags = "g"
+rsa.overwrite = True
+rsa.run()
+
+# For all above:
+
+if rsa.return_state == 0:
+    print "Run successfully"
+    print rsa.stdout
+    print rsa.stderr
+
+# print some metadata
+
+print rsa.name
+print rsa.description
+print rsa.keywords
+print rsa.inputs
+print rsa.inputs["elev"].description
+print rsa.inputs["elev"].type
+print rsa.inputs["elev"].multiple
+print rsa.inputs["elev"].required
+print rsa.outputs
+...
+
+if rsa.outputs["aspect"] == None:
+    print "Aspect is not computed"
 """
 from __future__ import print_function
-from xml.etree.ElementTree import fromstring
-from jinja2 import Environment
 import subprocess
-
-import sys, os
-import fnmatch
-
-# add the wxpython core to the python path
-sys.path.append(os.path.join(os.environ['GISBASE'],
-                             'etc','gui','wxpython','core'))
-# import GetGRASSCommands
-from globalvar import GetGRASSCommands as get_modules
-
-CMDs = list(get_modules()[0])
-CMDs.sort()
-
-#/home/pietro/docdat/phd/GSoC2012/grass7/dist.x86_64-unknown-linux-gnu/etc/gui/wxpython/core/globalvar.py
-
-# defien a new custom filter in jinja
-def do_repr(obj):
-    return repr(obj)
-
-environment = Environment()
-# add the custom filter
-environment.filters['repr'] = do_repr
-
-#=====================================================================
-# TEMPLATES
-#
-# Raster template
-RASTER = '''
-#/bin/env python
-# -*- coding: utf-8 -*-
-
-#DO NOT MODIFY THIS FILE, IT IS AUTOMATICALLY GENERATED
 import collections
+from itertools import izip_longest
+from xml.etree.ElementTree import fromstring
+import numpy as np
 
-# set path
-import sys, os
-sys.path.append(os.getcwd())
-sys.path.append("%s/../.."%(os.getcwd()))
-
-import pygrass
-
-from grass.script import core
-
-def free(a): return a
-
-rastclass = {
-'row'    : pygrass.RasterRow,
-'rowio'  : pygrass.RasterRowIO,
-'segment': pygrass.RasterSegment,
-'numpy'  : pygrass.RasterNumpy,
-'str'    : str,
-'free'   : free}
-
-{% for func in functions %}
-#
-# {{ func.cmd_name }}
-#
-{{ func.src }}
-
-
-
-{% endfor %}
-
-'''
-
-# Function template
-FUNCTION = '''
-def {{ func_name }}({%- set count = 1 -%}
-    {%- for p in parameters -%}
-        {%- if p.required -%}
-            {{ p.name }},{{ ' ' }}
-        {%- elif p.has_key('default') -%}
-            {{ p.name }} = {{ p.default|repr }},{{ ' ' }}
-        {%- else -%}
-            {{ p.name }} = None,{{ ' ' }}
-        {%- endif -%}
-        {%- if count % 3 == 0 -%}
-            {{ '\n' + ' ' * func_name_len }}
-        {%- endif -%}
-        {%- set count = count + 1 -%}
-    {%- endfor -%}
-    {%- for f in flags -%}
-        {{ f.name }} = False,{{ ' ' }}
-        {%- if count % 3 == 0 -%}
-            {{ '\n' + ' ' * func_name_len }}
-        {%- endif -%}
-        {%- set count = count + 1 -%}
-    {%- endfor -%} rtype = 'row'):
-    """{{ cmd_name }}
-    {{description}}
-
-    Parameters
-    ----------
-    {% for p in parameters %}
-    {{ p.name }}: {{ p.type }},
-        {%- if p.required -%}
-            required,
-        {%- else -%}
-            optional,
-        {%- endif -%}
-        {%- if p.multiple %}
-            multiple,
-        {% endif %}
-        {{ p.description }}
-        {%- if p.has_key('values') -%}
-            Values: {{ p['values']|join(', ') }}
-        {%- endif %}{% endfor %}
-    {%- for f in flags %}
-    {{ f.name }}: boolean
-        {{ f.description }}
-    {%- endfor %}
-    rtype: string
-        choose which Raster class the function should return.
-        Possible values are: 'row', 'rowio', 'segment', 'numpy', 'str', 'free'.
-    """
-    kargs = {} #collections.OrderedDict()
-    # Check parameters type:
-    {% for p in parameters %}
-    if {{ p.name }} != None:
-        if isinstance({{ p.name }}, list) or isinstance({{ p.name }}, tuple):
-            kargs['{{ p.name }}'] = ','.join([{{ check[p.type] }}(i) for i in {{ p.name }}])
-        else:
-            kargs['{{ p.name }}'] = {{ check[p.type] }}({{ p.name }})
-    {%- endfor %}
-
-    kargs['flags'] = ''
-    # add flags
-    {%- for f in flags %}
-    {%- if f.name in ('verbose','overwrite','quiet') %}
-    kargs['{{ f.name }}'] = {{ f.name }}
-    {%- else %}
-    if {{ f.name }}: kargs['flags'] += '{{ f.name }}'
-    {%- endif -%}
-    {% endfor %}
-
-    core.run_command('{{ cmd_name }}', **kargs)
-
-    results = []
-    #Choose which output should be return by the function
-    {% for p in parameters %}
-        {%- if p.has_key('gisprompt') and p.gisprompt.age == 'new' and p.gisprompt.prompt == 'raster' %}
-    if {{ p.name }} != None: results.append(rastclass[rtype]({{ p.name }}))
-        {%- endif -%}
-    {%- endfor %}
-
-    return tuple(results) if len(results) > 1 else results[0]
-'''
-
-getfromtag = {
+_GETFROMTAG = {
 'description' : lambda p: p.text.strip(),
 'keydesc'     : lambda p: p.text.strip(),
 'gisprompt'   : lambda p: dict(p.items()),
@@ -168,138 +76,361 @@ getfromtag = {
 'suppress_required' : lambda p: None,
 }
 
-def cleanparamname(name):
-    if name in ('lambda', 'from'):
-        return '%s_' % name
-    elif fnmatch.fnmatch(name, '[0,1,2,3,4,5,6,7,8,9]*'):
-        return '_%s' % name
-    else:
-        return name
-
-checktype = {'string' : 'str',
-'integer': 'int',
-'float': 'float',
+_GETTYPE = {
+'string' : str,
+'integer': np.int32,
+'float'  : np.float32,
+'double' : np.float64,
 }
 
-def get_par(paramxml):
-    par = dict(paramxml.items())
-    #par['name'] = cleanparamname(par['name'])
-    if par.has_key('required'):
-        par['required'] = True if par['required'] == 'yes' else False
-    else: par['required'] =  False
-    if par.has_key('multiple'):
-        par['multiple'] = True if par['multiple'] == 'yes' else False
-    else: par['multiple'] =  False
-    for p in paramxml:
-        if getfromtag.has_key(p.tag):
-            par[p.tag] = getfromtag[p.tag](p)
+class ParameterError(Exception): pass
+class FlagError(Exception): pass
+
+def _element2dict(xparameter):
+    diz = dict(xparameter.items())
+    for p in xparameter:
+        if _GETFROMTAG.has_key(p.tag):
+            diz[p.tag] = _GETFROMTAG[p.tag](p)
         else:
             print('New tag: %s, ignored' % p.tag )
-    return par
+    return diz
 
-def sort_params(params):
-    last = 0
-    for i in (i for i, p in enumerate(params) if p['required']):
-        par = params.pop(i)
-        params.insert(last, par)
-        last += 1
-    return params
+_DOC = {
+#------------------------------------------------------------
+# head
+'head' : """{cmd_name}({cmd_params})
 
+Parameters
+----------
 
-
-
-def get_flag(flagxml):
-    flag = {}
-    flag['name'] = flagxml.get('name')
-    flag['description'] = flagxml.find('description').text
-    return flag
-
-
-class Module(object):
-    def __init__(self, name):
-        self.cmd_name = name
-        self.cmd = subprocess.Popen([self.cmd_name, "--interface-description"],
-                                    stdout=subprocess.PIPE)
-        self.xml = self.cmd.communicate()[0]
-        #self.tree = ElementTree()
-        self.tree = fromstring(self.xml)
-        self.parameters = self.tree.findall("parameter")
-        self.flags = self.tree.findall("flag")
-        self.dparams = sort_params([get_par(p) for p in self.parameters])
-        self.dflags = [get_par(f) for f in self.flags]
-
-    def clean_name(self):
-        return '_'.join(self.cmd_name.split('.')[1:])
-
-    def get_dict(self):
-        func = environment.from_string(FUNCTION)
-        diz = {'parameters' : self.dparams, 'flags' : self.dflags,
-               'check' : checktype, 'cmd_name' : self.cmd_name,
-               'func_name' : self.clean_name()}
-        diz['func_name_len'] = len(diz['func_name']) + 5
-        diz['src'] = func.render(**diz)
-        return diz
+""",
+#------------------------------------------------------------
+# param
+'param' : """{name}: {default}{required}{multi}{ptype}
+    {description}{values}""",
+#------------------------------------------------------------
+# flag_head
+'flag_head' : """
+Flags
+------
+""",
+#------------------------------------------------------------
+# flag
+'flag' : """{name}: {default}
+    {description}""",
+#------------------------------------------------------------
+# foot
+'foot' : """run: True, optional
+    If True execute the module.
+stdin: PIPE,
+    Set the standard input
+stdout: PIPE
+    Set the standard output
+stderr: PIPE
+    Set the standard error"""}
 
 
-def filter_cmds(filter_string):
-    """Return a list of grass commands filtered using
-    the Unix shell-style wildcards
+class Parameter(object):
 
-    Example
-    -------
-
-    >>> cmds = filter_cmds('t.rast.*')
-    >>> cmds.sort()
-    >>> cmds # doctest: +ELLIPSIS
-    ['t.rast.aggregate', ..., 't.rast.to.rast3', 't.rast.univar']
-
-    """
-    return fnmatch.filter(CMDs, filter_string)
-
-
-BLACKLIST = ['r.solute.transport',]
-def rm_bad_modules(cmdlist):
-    """Remove all the modules that use number as flags and bad parameter's name"""
-    cleaned = []
-    for cmd in cmdlist:
-        add = True
-        if cmd['cmd_name'] in BLACKLIST:
-                print('Module not supported: %s - in in the blacklist' % cmd['cmd_name'].ljust(20))
-                add = False
+    def __init__(self, xparameter = None, diz = None):
+        self._value = None
+        diz = _element2dict(xparameter) if xparameter != None else diz
+        if diz == None: raise TypeError('Xparameter or diz are required')
+        self.name = diz['name']
+        self.required = True if diz['required'] == 'yes' else False
+        self.multiple = True if diz['multiple'] == 'yes' else False
+        # check the type
+        if _GETTYPE.has_key(diz['type']):
+            self.type = _GETTYPE[diz['type']]
+            self.typedesc = diz['type']
+            self._type = _GETTYPE[diz['type']]
         else:
-            for flag in cmd['flags']:
-                if flag['name'] in '0123456789':
-                    print('Module not supported: %s - flag is a number' % cmd['cmd_name'].ljust(20))
-                    add = False
-                    break
-            for par in cmd['parameters']:
-                if par['name'] in ('lambda', 'from'):
-                    print('Module not supported: %s - bad parameter name: %s' % (cmd['cmd_name'].ljust(20), par['name']))
-                    add = False
-                    break
-                elif par['name'][0] in '0123456789':
-                    print('Module not supported: %s - bad parameter name: %s' % (cmd['cmd_name'].ljust(20), par['name']))
-                    add = False
-                    break
-        if add: cleaned.append(cmd)
-    return cleaned
+            raise TypeError('New type: %s, ignored' % diz['type'] )
 
-def make():
-    rasters_cmd = []
-    for cmd in filter_cmds('r.*'):
-        #print(cmd)
-        modul = Module(cmd)
-        rasters_cmd.append(modul.get_dict())
-    # clean from bad modules
-    clean_cmd = rm_bad_modules(rasters_cmd)
-    #import pdb; pdb.set_trace()
-    cwd = os.path.dirname( os.path.realpath( __file__ ) )
-    raster = file(os.path.join(cwd, 'raster.py'), 'w+')
-    rast = environment.from_string(RASTER)
-    print(rast.render(functions = clean_cmd), file = raster)
-
-#print(lfuncs[0]['src'])
+        self.description = diz['description']
+        self.keydesc = diz['keydesc'] if diz.has_key('keydesc') else None
+        self.values = [self._type(i) for i in diz['values']] if diz.has_key('values') else None
+        self.default = self._type(diz['default']) if diz.has_key('default') else None
+        self.guisection = diz['guisection'] if diz.has_key('guisection') else None
+        if diz.has_key('gisprompt'):
+            self.type = diz['gisprompt']['prompt']
+            self.input = False if diz['gisprompt']['age'] == 'new' else True
+        else:
+            self.input = True
 
 
+    def _get_value(self):
+        return self._value
+
+    def _set_value(self, value):
+        #import pdb; pdb.set_trace()
+        if isinstance(value, list) or isinstance(value, tuple):
+            if self.multiple:
+                # check each value
+                self._value = [val for val in value if isinstance(value, self._type)]
+            else:
+                raise TypeError('The Parameter <%s>, not support multiple inputs' % self.name)
+        elif isinstance(value, self._type):
+            if self.values:
+                if value in self.values:
+                    self._value = value
+                else:
+                    TypeError('The Parameter <%s>, must be one of: %r' % (self.name, self.values))
+            else:
+                self._value = value
+        else:
+            raise TypeError('The Parameter <%s>, require: %s' % (self.name, self.typedesc))
+
+    value = property(fget = _get_value, fset = _set_value)
 
 
+    def __str__(self):
+        if isinstance(self._value, list) or isinstance(self._value, tuple):
+            value = ','.join([ str(v) for v in self._value])
+        else:
+            value = str(self._value)
+        return "%s=%s" % (self.name, value)
+
+    def __repr__(self):
+        return "Parameter <%s> (required:%s, type:%s, multiple:%s)" % (self.name,
+               "yes" if self.required else "no", self.type,
+               "yes" if self.multiple else "no")
+
+    @property
+    def __doc__(self):
+        """
+        {name}: {default}{required}{multi}{ptype}
+            {description}{values}"","""
+        return _DOC['param'].format(name = self.name,
+               default = repr(self.default) + ', ' if self.default else '',
+               required = 'required, ' if self.required else 'optional, ',
+               multi = 'multi' if self.multiple else '',
+               ptype = self.typedesc, description = self.description,
+               values = '\n    Values: {vls}'.format(
+                        vls = ', '.join([repr(val) for val in self.values]))
+                        if self.values else '')
+
+
+class TypeDict(collections.OrderedDict):
+    def __init__(self, dict_type, *args, **kargs):
+        self.type = dict_type
+        super(TypeDict, self).__init__(*args, **kargs)
+
+    def __setitem__(self, key, value):
+        if isinstance(value, self.type):
+            super(TypeDict, self).__setitem__(key, value)
+        else:
+            cl = repr(self.type).strip().replace("'",'').replace('>','').split('.')
+            raise TypeError('The value: %r is not a %s object' % (value, cl[-1].title()))
+
+    @property
+    def __doc__(self):
+        return '\n'.join([self.__getitem__(obj).__doc__ for obj in self.__iter__()])
+
+class Flag(object):
+    def __init__(self, xflag = None, diz = None):
+        self.value = None
+        diz = _element2dict(xflag) if xflag != None else diz
+        self.name = diz['name']
+        self.special = True if self.name in ('verbose', 'overwrite', 'quiet', 'run') else False
+        self.description = diz['description']
+        self.default = diz['default'] if diz.has_key('default') else None
+        self.guisection = diz['guisection'] if diz.has_key('guisection') else None
+
+    def __str__(self):
+        if self.value:
+            if self.special:
+                return '--%s' % self.name[0]
+            else:
+                return '-%s' % self.name
+        else:
+            return ''
+
+    def __repr__(self):
+        return "Flag <%s> (%s)" % (self.name, self.description)
+
+    @property
+    def __doc__(self):
+        """
+        {name}: {default}
+            {description}"""
+        return _DOC['flag'].format(name = self.name,
+               default = repr(self.default), description = self.description)
+
+# dictionary used to add the parameter "flags"
+_FLAGSDICT = {
+'name'        : 'flags',
+'required'    : 'no',
+'multiple'    : 'no',
+'type'        : 'string',
+'description' : 'Define flags that will be used by the module without "-"',
+}
+
+# dictionary used to add the flag "now"
+_NOWDICT = {
+'name' : 'run_now',
+'description' : 'Define if the module must be execute now or later',
+'default' : True,
+}
+
+
+class Factory(object):
+
+    def __init__(self, cmd, *args, **kargs):
+        self.name = cmd
+        get_cmd_xml = subprocess.Popen([cmd, "--interface-description"],
+                                       stdout=subprocess.PIPE)
+        self.xml = get_cmd_xml.communicate()[0]
+        tree = fromstring(self.xml)
+
+        #
+        # extract parameters from the xml
+        #
+        self.params_list = [Parameter(p) for p in tree.findall("parameter")]
+        self.inputs = TypeDict(Parameter)
+        self.outputs = TypeDict(Parameter)
+        self.required = []
+        # Insert parameters into input/output and required
+        for par in self.params_list:
+            if par.input:
+                self.inputs[par.name] = par
+            else:
+                self.outputs[par.name] = par
+            if par.required:
+                self.required.append(par)
+
+        #
+        # extract flags from the xml
+        #
+        flags_list = [Flag(f) for f in tree.findall("flag")]
+        self.flags_dict = TypeDict(Flag)
+        for flag in flags_list:
+            self.flags_dict[flag.name] = flag
+
+        #
+        # Add new attributes to the class
+        #
+        self._flags = ''
+        self._run = True
+        self.stdin = subprocess.PIPE
+        self.stdout = subprocess.PIPE
+        self.stderr = subprocess.PIPE
+        self.popen = None
+
+        if args or kargs:
+            self.__call__(*args, **kargs)
+
+    def _get_flags(self):
+        return self._flags
+
+    def _set_flags(self, value):
+        if isinstance(value, str):
+            #import pdb; pdb.set_trace()
+            if value in [flg for flg in self.flags_dict \
+                         if not self.flags_dict[flg].special ] :
+                self._flags = value
+            else:
+                raise TypeError('Flag not valid')
+        else:
+            raise TypeError('The flags attribute must be a string')
+
+    flags = property(fget = _get_flags, fset = _set_flags)
+
+    def __call__(self, *args, **kargs):
+        if not args and not kargs:
+            self.run()
+            return
+        #
+        # check for extra kargs
+        #
+        if 'run' in kargs:
+            self._run = kargs['run']
+            del(kargs['run'])
+        if 'flags' in kargs:
+            self.flags = kargs['flags']
+            del(kargs['flags'])
+        if 'stdin' in kargs:
+            self.stdin = kargs['stdin']
+            del(kargs['stdin'])
+        if 'stdout' in kargs:
+            self.stdout = kargs['stdout']
+            del(kargs['stdout'])
+        if 'stderr' in kargs:
+            self.stderr = kargs['stderr']
+            del(kargs['stderr'])
+        #
+        # check args
+        #
+        for param, arg in zip(self.params_list, args):
+            param.value = arg
+        for key, val in kargs.items():
+            if key in self.inputs:
+                self.inputs[key].value = val
+            elif key in self.outputs:
+                self.outputs[key].value = val
+            elif key in self.flags_dict:
+                # we need to add this, because some parameters (overwrite,
+                # verbose and quiet) work like parameters
+                self.flags_dict[key].value = val
+            else:
+                raise ParameterError('Parameter not found')
+
+        #
+        # check reqire parameters
+        #
+        for par in self.required:
+            if par.value == None:
+                raise ParameterError("Required parameter <%s> not set." % par.name)
+
+        #
+        # check flags parameters
+        #
+        if self.flags:
+            # check each character in flags
+            for flag in self.flags:
+                if flag in self.flags_dict:
+                    self.flags_dict[flag].value = True
+                else:
+                    raise FlagError('Flag "%s" not valid.')
+
+        #
+        # check if execute
+        #
+        if self._run:
+            self.run()
+
+    @property
+    def __doc__(self):
+        """{cmd_name}({cmd_params})
+        """
+        head = _DOC['head'].format(cmd_name = self.name,
+               cmd_params = ('\n' + (' ' * (len(self.name) + 1))).join(
+               [', '.join(
+               [str(i) for i in line if i != None])
+               for line in izip_longest(*[iter(self.params_list)]*3)]),)
+        params = '\n'.join([par.__doc__ for par in self.params_list])
+        flags = self.flags_dict.__doc__
+        return '\n'.join([head, params, _DOC['flag_head'], flags])
+
+
+    def make_cmd(self):
+        args = [self.name, ]
+        for par in self.params_list:
+            if par.value != None:
+                args.append(str(par))
+        for flg in self.flags_dict:
+            if self.flags_dict[flg].value != None:
+                args.append(str(self.flags_dict[flg]))
+        return args
+
+    def run(self, node = None):
+        cmd = self.make_cmd()
+        print(repr(cmd))
+        self.popen = subprocess.Popen(cmd, stdin=self.stdin)#,
+                                      #stdout=self.stout, stderr=self.stderr )
+
+
+
+
+
+#slp = Factory('r.slope.aspect')
