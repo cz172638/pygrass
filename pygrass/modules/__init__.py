@@ -64,6 +64,17 @@ from itertools import izip_longest
 from xml.etree.ElementTree import fromstring
 import numpy as np
 
+
+#
+# this dictionary is used to extract the value of interest from the xml
+# the lambda experssion is used to define small simple functions,
+# is equivalent to: ::
+#
+# def f(p):
+#     return p.text.strip()
+#
+# and then we call f(p)
+#
 _GETFROMTAG = {
 'description' : lambda p: p.text.strip(),
 'keydesc'     : lambda p: p.text.strip(),
@@ -95,6 +106,7 @@ def _element2dict(xparameter):
             print('New tag: %s, ignored' % p.tag )
     return diz
 
+# dictionary used to create docstring for the objects
 _DOC = {
 #------------------------------------------------------------
 # head
@@ -175,12 +187,14 @@ class Parameter(object):
                 if value in self.values:
                     self._value = value
                 else:
-                    TypeError('The Parameter <%s>, must be one of: %r' % (self.name, self.values))
+                    raise TypeError('The Parameter <%s>, must be one of: %r' % (self.name, self.values))
             else:
                 self._value = value
         else:
             raise TypeError('The Parameter <%s>, require: %s' % (self.name, self.typedesc))
 
+    # here the property function is used to transform value in an attribute
+    # in this case we define which function must be use to get/set the value
     value = property(fget = _get_value, fset = _set_value)
 
 
@@ -196,9 +210,12 @@ class Parameter(object):
                "yes" if self.required else "no", self.type,
                "yes" if self.multiple else "no")
 
+    # here we use property with a decorator, in this way we mask a method as
+    # a class attribute
     @property
     def __doc__(self):
-        """
+        """Return the docstring of the parameter
+
         {name}: {default}{required}{multi}{ptype}
             {description}{values}"","""
         return _DOC['param'].format(name = self.name,
@@ -226,6 +243,9 @@ class TypeDict(collections.OrderedDict):
     @property
     def __doc__(self):
         return '\n'.join([self.__getitem__(obj).__doc__ for obj in self.__iter__()])
+
+    def __call__(self):
+        return [self.__getitem__(obj) for obj in self.__iter__()]
 
 class Flag(object):
     def __init__(self, xflag = None, diz = None):
@@ -257,30 +277,18 @@ class Flag(object):
         return _DOC['flag'].format(name = self.name,
                default = repr(self.default), description = self.description)
 
-# dictionary used to add the parameter "flags"
-_FLAGSDICT = {
-'name'        : 'flags',
-'required'    : 'no',
-'multiple'    : 'no',
-'type'        : 'string',
-'description' : 'Define flags that will be used by the module without "-"',
-}
-
-# dictionary used to add the flag "now"
-_NOWDICT = {
-'name' : 'run_now',
-'description' : 'Define if the module must be execute now or later',
-'default' : True,
-}
-
 
 class Factory(object):
 
     def __init__(self, cmd, *args, **kargs):
         self.name = cmd
+        # call the command with --interface-description
         get_cmd_xml = subprocess.Popen([cmd, "--interface-description"],
                                        stdout=subprocess.PIPE)
+        # get the xml of the module
         self.xml = get_cmd_xml.communicate()[0]
+        # transform and parse the xml into an Elemen class:
+        # http://docs.python.org/library/xml.etree.elementtree.html
         tree = fromstring(self.xml)
 
         #
@@ -325,7 +333,7 @@ class Factory(object):
 
     def _set_flags(self, value):
         if isinstance(value, str):
-            #import pdb; pdb.set_trace()
+            # we need to check if the flag is valid, special flags are not allow
             if value in [flg for flg in self.flags_dict \
                          if not self.flags_dict[flg].special ] :
                 self._flags = value
@@ -341,7 +349,7 @@ class Factory(object):
             self.run()
             return
         #
-        # check for extra kargs
+        # check for extra kargs, set attribute and remove from dictionary
         #
         if 'run' in kargs:
             self._run = kargs['run']
