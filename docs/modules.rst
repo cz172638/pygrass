@@ -1,70 +1,179 @@
 Modules
 =======
 
-Modules code can be generated with the make function, you need to geerate
-functions only the first time. The function remove some modules that have
-parameters or flags name that are problematic. ::
+Grass modules are represented as objects. These objects are generated based
+on the XML module description that is used for GUI generation already. ::
 
-    >>> from pygrass import modules
-    >>> modules.make()
-    Module not supported: r.describe           - flag is a number
-    Module not supported: r.flow               - flag is a number
-    Module not supported: r.in.srtm            - flag is a number
-    Module not supported: r.out.arc            - flag is a number
-    Module not supported: r.region             - bad parameter name: 3dview
-    Module not supported: r.resamp.bspline     - bad parameter name: lambda
-    Module not supported: r.rescale            - bad parameter name: from
-    Module not supported: r.rescale.eq         - bad parameter name: from
-    Module not supported: r.solute.transport   - in in the blacklist
-    Module not supported: r.stats              - flag is a number
-    Module not supported: r.walk               - bad parameter name: lambda
-    Module not supported: r.watershed          - flag is a number
-
-To interact with the python modules: ::
-
-    >>> from pygrass.modules import raster as r
-
-then call function as python function: ::
-
-    >>> slp, asp = r.slope_aspect(elevation='elevation', slope='slp_f',
-    ...                           aspect='asp_f', format='percent',
-    ...                           overwrite=True)
+    >>> from pygrass.modules import Factory
+    >>> slope_aspect = Factory("r.slope.aspect", elevation='elevation',
+    ...                        slope='slp',  aspect='asp',
+    ...                        format='percent', overwrite=True)
 
 
-The function accept Raster object as input, so it is possible to write: ::
+It is possible to create a run-able module object and run later:
 
-    >>> import pygrass
-    >>> elev = pygrass.RasterRow('elevation')
-    >>> slp, asp = r.slope_aspect(elevation=elev, slope='slp_f',
-    ...                           aspect='asp_f', format='percent',
-    ...                           overwrite=True)
+    >>> slope_aspect = Factory("r.slope.aspect", elevation='elevation',
+    ...                        slope='slp',  aspect='asp',
+    ...                        format='percent', overwrite=True, run = False)
 
+Then we can run the module with: ::
 
-As default the function return RasterRow objects: ::
+    >>> slope_aspect()
 
-    >>> type(slp)
-    <class 'pygrass.raster.RasterRow'>
-    >>> type(asp)
-    <class 'pygrass.raster.RasterRow'>
+or using the run method: ::
+
+   >>> slope_aspect.run()
 
 
-But it is possible to choose which Raster class should be returned by the
-function, defining the option `rtype`. Possible values are: 'row', 'rowio',
-'segment', 'numpy', 'str', 'free'.
-'str' return the string name, the object that the user pass to the function. ::
+It is possible to initialize a module, and give the parameters later: ::
 
-    >>> import pygrass
-    >>> elev = pygrass.RasterRow('elevation')
-    >>> slp = pygrass.RasterRowIO('slp_f')
-    >>> asp = pygrass.RasterSegment('asp_f')
-    >>> dxx = pygrass.RasterNumpy('dxx')
-    >>> slp, asp, dxx = r.slope_aspect(elevation=elev, slope=slp,
-    ...                           aspect=asp, dxx = dxx, format='percent',
-    ...                           overwrite=True, rtype = 'free')
-    >>> type(slp)
-    <class 'pygrass.raster.RasterRowIO'>
-    >>> type(asp)
-    <class 'pygrass.raster.RasterSegment'>
-    >>> type(dxx)
-    <class 'pygrass.raster.RasterNumpy'>
+    >>> slope_aspect = Factory("r.slope.aspect")
+    >>> slope_aspect(elevation='elevation', slope='slp',  aspect='asp',
+    ...              format='percent', overwrite=True)
+
+
+Create the module object input step by step and run later: ::
+
+    >>> slope_aspect = Factory("r.slope.aspect")
+    >>> slope_aspect.inputs['elevation']
+    Parameter <elevation> (required:yes, type:raster, multiple:no)
+    >>> slope_aspect.inputs["elevation"].value = "elevation"
+    >>> slope_aspect.inputs["format"]
+    Parameter <format> (required:no, type:string, multiple:no)
+    >>> print slope_aspect.inputs["format"].__doc__
+    format: 'degrees', optional, string
+        Format for reporting the slope
+        Values: 'degrees', 'percent'
+    >>> slope_aspect.inputs["format"].value = 'percents'
+    Traceback (most recent call last):
+        ...
+    ValueError: The Parameter <format>, must be one of: ['degrees', 'percent']
+    >>> slope_aspect.inputs["format"].value = 'percent'
+    >>> slope_aspect.flags = "g"
+    Traceback (most recent call last):
+        ...
+    ValueError: Flag not valid, valid flag are: ['a']
+    >>> slope_aspect.flags = "a"
+    >>> slope_aspect.flags_dict['overwrite']
+    Flag <overwrite> (Allow output files to overwrite existing files)
+    >>> slope_aspect.flags_dict['overwrite'].value = True
+    >>> slope_aspect()
+
+
+After we set the parameter and run the module, the execution of the module
+instantiate a popen attribute to the class. The Poepen class allow user
+to kill/wait/ the process.
+
+    >>> slope_aspect.popen.kill()
+
+
+It is possible to access to the module info, with:
+
+    >>> slope_aspect.name
+    'r.slope.aspect'
+    >>> slope_aspect.description
+    'Aspect is calculated counterclockwise from east.'
+    >>> slope_aspect.keywords
+    'raster, terrain'
+    >>> slope_aspect.label
+    'Generates raster maps of slope, aspect, curvatures and partial derivatives from a elevation raster map.'
+
+and get the module documentation with: ::
+
+    >>> print slope_aspect.__doc__
+    r.slope.aspect(elevation=elevation, slope=None, aspect=None
+                   format=percent, prec=None, pcurv=None
+                   tcurv=None, dx=None, dy=None
+                   dxx=None, dyy=None, dxy=None
+                   zfactor=None, min_slp_allowed=None)
+    <BLANKLINE>
+    Parameters
+    ----------
+    <BLANKLINE>
+    <BLANKLINE>
+    elevation: required, string
+        Name of input elevation raster map
+    slope: optional, string
+        Name for output slope raster map
+    aspect: optional, string
+        Name for output aspect raster map
+    format: 'degrees', optional, string
+        Format for reporting the slope
+        Values: 'degrees', 'percent'
+    prec: 'float', optional, string
+        Type of output aspect and slope maps
+        Values: 'default', 'double', 'float', 'int'
+    pcurv: optional, string
+        Name for output profile curvature raster map
+    tcurv: optional, string
+        Name for output tangential curvature raster map
+    dx: optional, string
+        Name for output first order partial derivative dx (E-W slope) raster map
+    dy: optional, string
+        Name for output first order partial derivative dy (N-S slope) raster map
+    dxx: optional, string
+        Name for output second order partial derivative dxx raster map
+    dyy: optional, string
+        Name for output second order partial derivative dyy raster map
+    dxy: optional, string
+        Name for output second order partial derivative dxy raster map
+    zfactor: 1.0, optional, float
+        Multiplicative factor to convert elevation units to meters
+    min_slp_allowed: optional, float
+        Minimum slope val. (in percent) for which aspect is computed
+    <BLANKLINE>
+    Flags
+    ------
+    <BLANKLINE>
+    a: None
+        Do not align the current region to the elevation layer
+    overwrite: None
+        Allow output files to overwrite existing files
+    verbose: None
+        Verbose module output
+    quiet: None
+        Quiet module output
+
+
+
+For each inputs and outputs parameters it is possible to get info, to see all
+the module inputs, just type: ::
+
+    >>> slope_aspect.inputs #doctest: +NORMALIZE_WHITESPACE
+    TypeDict([
+    ('elevation', Parameter <elevation> (required:yes, type:string, multiple:no)),
+    ('format', Parameter <format> (required:no, type:string, multiple:no)),
+    ('prec', Parameter <prec> (required:no, type:string, multiple:no)),
+    ('zfactor', Parameter <zfactor> (required:no, type:float, multiple:no)),
+    ('min_slp_allowed', Parameter <min_slp_allowed> (required:no, type:float, multiple:no))
+    ])
+
+To get info for each parameter: ::
+
+    >>> slope_aspect.inputs["elevation"].description
+    'Name of input elevation raster map'
+    >>> slope_aspect.inputs["elevation"].type
+    'raster'
+    >>> slope_aspect.inputs["elevation"].typedesc
+    'string'
+    >>> slope_aspect.inputs["elevation"].multiple
+    False
+    >>> slope_aspect.inputs["elevation"].required
+    True
+
+Or get a small documentation for each parameter with:
+
+    >>> print slope_aspect.inputs["elevation"].__doc__
+    elevation: required, string
+        Name of input elevation raster map
+
+
+User or developer can check which parameter are set, with: ::
+
+    if slope_aspect.outputs['aspect'].value == None:
+        print "Aspect is not computed"
+
+
+
+
 

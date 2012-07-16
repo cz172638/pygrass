@@ -83,8 +83,9 @@ _GETFROMTAG = {
 'values'      : lambda p: [e.text.strip() for e in p.findall('value/name')],
 'value'       : lambda p: None,
 'guisection'  : lambda p: p.text.strip(),
-'label'       : lambda p: None,
+'label'       : lambda p: p.text.strip(),
 'suppress_required' : lambda p: None,
+'keywords'    : lambda p: p.text.strip(),
 }
 
 _GETTYPE = {
@@ -187,7 +188,7 @@ class Parameter(object):
                 if value in self.values:
                     self._value = value
                 else:
-                    raise TypeError('The Parameter <%s>, must be one of: %r' % (self.name, self.values))
+                    raise ValueError('The Parameter <%s>, must be one of: %r' % (self.name, self.values))
             else:
                 self._value = value
         else:
@@ -207,7 +208,8 @@ class Parameter(object):
 
     def __repr__(self):
         return "Parameter <%s> (required:%s, type:%s, multiple:%s)" % (self.name,
-               "yes" if self.required else "no", self.type,
+               "yes" if self.required else "no",
+               self.type if self.type in ('raster', 'vector') else self.typedesc,
                "yes" if self.multiple else "no")
 
     # here we use property with a decorator, in this way we mask a method as
@@ -291,6 +293,11 @@ class Factory(object):
         # http://docs.python.org/library/xml.etree.elementtree.html
         tree = fromstring(self.xml)
 
+        for e in tree:
+            if e.tag not in ('parameter', 'flag'):
+                #import pdb; pdb.set_trace()
+                self.__setattr__(e.tag, _GETFROMTAG[e.tag](e))
+
         #
         # extract parameters from the xml
         #
@@ -333,12 +340,13 @@ class Factory(object):
 
     def _set_flags(self, value):
         if isinstance(value, str):
+            flgs = [flg for flg in self.flags_dict \
+                         if not self.flags_dict[flg].special ]
             # we need to check if the flag is valid, special flags are not allow
-            if value in [flg for flg in self.flags_dict \
-                         if not self.flags_dict[flg].special ] :
+            if value in  flgs:
                 self._flags = value
             else:
-                raise TypeError('Flag not valid')
+                raise ValueError('Flag not valid, valid flag are: %r' % flgs)
         else:
             raise TypeError('The flags attribute must be a string')
 
@@ -433,7 +441,7 @@ class Factory(object):
 
     def run(self, node = None):
         cmd = self.make_cmd()
-        print(repr(cmd))
+        #print(repr(cmd))
         self.popen = subprocess.Popen(cmd, stdin=self.stdin)#,
                                       #stdout=self.stout, stderr=self.stderr )
 
