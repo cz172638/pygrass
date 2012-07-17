@@ -176,7 +176,6 @@ class Parameter(object):
         return self._value
 
     def _set_value(self, value):
-        #import pdb; pdb.set_trace()
         if isinstance(value, list) or isinstance(value, tuple):
             if self.multiple:
                 # check each value
@@ -295,7 +294,6 @@ class Factory(object):
 
         for e in tree:
             if e.tag not in ('parameter', 'flag'):
-                #import pdb; pdb.set_trace()
                 self.__setattr__(e.tag, _GETFROMTAG[e.tag](e))
 
         #
@@ -442,8 +440,8 @@ class Factory(object):
     def run(self, node = None):
         cmd = self.make_cmd()
         #print(repr(cmd))
-        self.popen = subprocess.Popen(cmd, stdin=self.stdin)#,
-                                      #stdout=self.stout, stderr=self.stderr )
+        self.popen = subprocess.Popen(cmd, stdin=self.stdin,
+                                      stdout=self.stdout, stderr=self.stderr)
 
 
 

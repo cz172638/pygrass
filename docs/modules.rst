@@ -60,12 +60,6 @@ Create the module object input step by step and run later: ::
     >>> slope_aspect()
 
 
-After we set the parameter and run the module, the execution of the module
-instantiate a popen attribute to the class. The Poepen class allow user
-to kill/wait/ the process.
-
-    >>> slope_aspect.popen.kill()
-
 
 It is possible to access to the module info, with:
 
@@ -140,13 +134,7 @@ For each inputs and outputs parameters it is possible to get info, to see all
 the module inputs, just type: ::
 
     >>> slope_aspect.inputs #doctest: +NORMALIZE_WHITESPACE
-    TypeDict([
-    ('elevation', Parameter <elevation> (required:yes, type:string, multiple:no)),
-    ('format', Parameter <format> (required:no, type:string, multiple:no)),
-    ('prec', Parameter <prec> (required:no, type:string, multiple:no)),
-    ('zfactor', Parameter <zfactor> (required:no, type:float, multiple:no)),
-    ('min_slp_allowed', Parameter <min_slp_allowed> (required:no, type:float, multiple:no))
-    ])
+    TypeDict([('elevation', Parameter <elevation> (required:yes, type:raster, multiple:no)), ('format', Parameter <format> (required:no, type:string, multiple:no)), ('prec', Parameter <prec> (required:no, type:string, multiple:no)), ('zfactor', Parameter <zfactor> (required:no, type:float, multiple:no)), ('min_slp_allowed', Parameter <min_slp_allowed> (required:no, type:float, multiple:no))])
 
 To get info for each parameter: ::
 
@@ -174,6 +162,20 @@ User or developer can check which parameter are set, with: ::
         print "Aspect is not computed"
 
 
+After we set the parameter and run the module, the execution of the module
+instantiate a popen attribute to the class. The `Popen`_ class allow user
+to kill/wait/ the process. ::
+
+    >>> slope_aspect = Factory('r.slope.aspect')
+    >>> slope_aspect(elevation = 'elevation', slope = 'slp', aspect = 'asp', overwrite = True)
+    >>> slope_aspect.popen.wait() # *.kill(), *.terminate()
+    0
+    >>> out, err = slope_aspect.popen.communicate()
+    >>> print err
+     100%
+    Aspect raster map <asp> complete
+    Slope raster map <slp> complete
+    <BLANKLINE>
 
 
-
+.. _Popen: http://docs.python.org/library/subprocess.html#Popen
