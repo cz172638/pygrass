@@ -5,27 +5,10 @@ Created on Thu Jun 28 17:44:14 2012
 @author: pietro
 """
 
-import grass.lib.gis as libgis
 import grass.lib.raster as libraster
-import grass.lib.segment as libseg
 from raster_type import TYPE as RTYPE
 import ctypes
-import numpy as np
 from operator import itemgetter
-
-#GET_ITH_CAT = {
-#    'CELL' : libraster.Rast_get_ith_c_cat,
-#    'FCELL': libraster.Rast_get_ith_f_cat,
-#    'DCELL': libraster.Rast_get_ith_d_cat,
-#}
-#
-#SET_CAT = {
-#    'CELL' : libraster.Rast_set_c_cat,
-#    'FCELL': libraster.Rast_set_f_cat,
-#    'DCELL': libraster.Rast_set_d_cat,
-#}
-
-
 
 
 class Category(list):
