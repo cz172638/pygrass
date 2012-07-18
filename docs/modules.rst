@@ -4,17 +4,17 @@ Modules
 Grass modules are represented as objects. These objects are generated based
 on the XML module description that is used for GUI generation already. ::
 
-    >>> from pygrass.modules import Factory
-    >>> slope_aspect = Factory("r.slope.aspect", elevation='elevation',
+    >>> from pygrass.modules import Module
+    >>> slope_aspect = Module("r.slope.aspect", elevation='elevation',
     ...                        slope='slp',  aspect='asp',
     ...                        format='percent', overwrite=True)
 
 
 It is possible to create a run-able module object and run later:
 
-    >>> slope_aspect = Factory("r.slope.aspect", elevation='elevation',
+    >>> slope_aspect = Module("r.slope.aspect", elevation='elevation',
     ...                        slope='slp',  aspect='asp',
-    ...                        format='percent', overwrite=True, run = False)
+    ...                        format='percent', overwrite=True, run_=False)
 
 Then we can run the module with: ::
 
@@ -27,14 +27,14 @@ or using the run method: ::
 
 It is possible to initialize a module, and give the parameters later: ::
 
-    >>> slope_aspect = Factory("r.slope.aspect")
+    >>> slope_aspect = Module("r.slope.aspect")
     >>> slope_aspect(elevation='elevation', slope='slp',  aspect='asp',
     ...              format='percent', overwrite=True)
 
 
 Create the module object input step by step and run later: ::
 
-    >>> slope_aspect = Factory("r.slope.aspect")
+    >>> slope_aspect = Module("r.slope.aspect")
     >>> slope_aspect.inputs['elevation']
     Parameter <elevation> (required:yes, type:raster, multiple:no)
     >>> slope_aspect.inputs["elevation"].value = "elevation"
@@ -166,16 +166,39 @@ After we set the parameter and run the module, the execution of the module
 instantiate a popen attribute to the class. The `Popen`_ class allow user
 to kill/wait/ the process. ::
 
-    >>> slope_aspect = Factory('r.slope.aspect')
-    >>> slope_aspect(elevation = 'elevation', slope = 'slp', aspect = 'asp', overwrite = True)
+    >>> slope_aspect = Module('r.slope.aspect')
+    >>> slope_aspect(elevation='elevation', slope='slp', aspect='asp', overwrite=True, finish_=False)
     >>> slope_aspect.popen.wait() # *.kill(), *.terminate()
     0
     >>> out, err = slope_aspect.popen.communicate()
-    >>> print err
+    >>> print err #doctest: +NORMALIZE_WHITESPACE
      100%
     Aspect raster map <asp> complete
     Slope raster map <slp> complete
     <BLANKLINE>
+
+On the above example we use a new parameter `finish_`, if is set to True, the
+run method, automatically store the stdout and stderr to stdout and stderr
+attributes of the class: ::
+
+    >>> slope_aspect = Module('r.slope.aspect')
+    >>> slope_aspect(elevation='elevation', slope='slp', aspect='asp', overwrite=True, finish_=True)
+    >>> print slope_aspect.stderr #doctest: +NORMALIZE_WHITESPACE
+     100%
+    Aspect raster map <asp> complete
+    Slope raster map <slp> complete
+    <BLANKLINE>
+
+Another example of use: ::
+
+    >>> info = Module("r.info", map="elevation", flags="r", finish_=True)
+    >>> from pygrass.modules import stdout2dict
+    >>> stdout2dict(info.stdout)
+    {'max': '156.3299', 'min': '55.57879'}
+    >>> info = Module("r.info", map="elevation", flags="r", finish_=False)
+    >>> category = Module("r.category", map="elevation",
+    ...                   stdin_=info.popen.stdout, finish_=True)
+
 
 
 .. _Popen: http://docs.python.org/library/subprocess.html#Popen
