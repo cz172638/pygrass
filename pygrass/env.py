@@ -5,7 +5,19 @@ Created on Tue Jun 26 12:38:48 2012
 @author: pietro
 """
 import grass.lib.gis as libgis
+import fnmatch
 from grass.script import core as grasscore
+
+def looking(filter_string, obj):
+    """
+
+    >>> looking('*area*', libvector)
+
+    """
+    word_list = [i for i in dir(obj)]
+    word_list.sort()
+    return fnmatch.filter(word_list, filter_string)
+
 
 def remove(**kargs):
     grasscore.run_command('g.remove', **kargs)
