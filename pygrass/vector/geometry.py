@@ -8,14 +8,14 @@ import grass.lib.gis as libgis
 libgis.G_gisinit('')
 import ctypes
 import grass.lib.vector as libvect
-from vector_type import VTYPE
+#from vector_type import VTYPE
 import numpy as np
 import re
 
-WKT = {#'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
-'POINT\((.*)\)' : 'point',
-'LINESTRING\((.*)\)' : 'line',
-}
+WKT = {  # 'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
+       'POINT\((.*)\)': 'point',
+       'LINESTRING\((.*)\)': 'line'}
+
 
 def read_WKT(string):
     """Read the string and return a geometry object
@@ -51,6 +51,7 @@ def read_WKT(string):
         if re.match(regexp, string):
             geo = 10
             return obj(geo)
+
 
 def read_WKB(buff):
     """Read the binary buffer and return a geometry object"""
@@ -113,6 +114,7 @@ class Bbox(object):
 # GEOMETRY
 #=============================================
 
+
 def get_xyz(pnt):
     """Return a tuple with: x, y, z. ::
 
@@ -141,36 +143,35 @@ def get_xyz(pnt):
         elif len(pnt) == 3:
             x, y, z = pnt
         else:
-            raise ValueError("The the format of the point is not supported: {0!r}".format(pnt))
+            str_error = "The the format of the point is not supported: {0!r}"
+            raise ValueError(str_error.format(pnt))
     return x, y, z
+
 
 class Point(object):
     """
-    Examples
-    ---------
 
     ::
 
-
-    >>> pnt = Point(0, 0)
-    >>> pnt.x
-    0.0
-    >>> pnt.y
-    0.0
-    >>> pnt.z
-    >>> pnt.is2D
-    True
-    >>> pnt.coords()
-    (0.0, 0.0)
-    >>> pnt.z = 0
-    >>> pnt.is2D
-    False
-    >>> pnt
-    Point(0.000000, 0.000000, 0.000000)
-    >>> print pnt
-    POINT(0.000000, 0.000000, 0.000000)
+        >>> pnt = Point(0, 0)
+        >>> pnt.x
+        0.0
+        >>> pnt.y
+        0.0
+        >>> pnt.z
+        >>> pnt.is2D
+        True
+        >>> pnt.coords()
+        (0.0, 0.0)
+        >>> pnt.z = 0
+        >>> pnt.is2D
+        False
+        >>> pnt
+        Point(0.000000, 0.000000, 0.000000)
+        >>> print pnt
+        POINT(0.000000, 0.000000, 0.000000)
     """
-    def __init__(self, x, y, z = None, is2D=True):
+    def __init__(self, x, y, z=None, is2D=True):
         self.c_px = ctypes.pointer(ctypes.c_double())
         self.c_py = ctypes.pointer(ctypes.c_double())
         self.c_pz = ctypes.pointer(ctypes.c_double())
@@ -205,7 +206,7 @@ class Point(object):
         return self.c_pz.contents.value
 
     def _set_z(self, value):
-        if value == None:
+        if value is None:
             self.is2D = True
             self.c_pz.contents.value = 0
         else:
@@ -218,29 +219,24 @@ class Point(object):
         return self.get_wkt()
 
     def __repr__(self):
-        return "Point(%s)" % ', '.join(['%f' % coord for coord in self.coords()])
+        return "Point(%s)" % ', '.join(['%f' % coord
+                                        for coord in self.coords()])
 
     def __eq__(self, pnt):
-        #TODO: use get_xyz function to compare
-        if isinstance(pnt, Point) and pnt.x == self.x and pnt.y == self.y and pnt.z == self.z:
-            return True
-        else:
-            if len(pnt) == 2:
-                if pnt[0] == self.x and pnt[1] == self.y:
-                    return True
-            elif len(pnt) == 3:
-                if pnt[0] == self.x and pnt[1] == self.y and pnt[2] == self.z:
-                    return True
-        return False
+        if isinstance(pnt, Point):
+            return pnt.coords() == self.coords()
 
+        return Point(*pnt).coords() == self.coords()
 
     def coords(self):
-        """Return a tuple with the point coordinates. ::
+        """Return a tuple with the point coordinates.
+        ::
 
             >>> pnt = Point(0, 0)
             >>> pnt.coords()
             (0.0, 0.0)
 
+        If the point is 2D return a x, y tuple.
         """
         if self.is2D:
             return self.x, self.y
@@ -253,8 +249,14 @@ class Point(object):
             >>> pnt = Point(0, 0)
             >>> pnt.get_wkt()
             'POINT(0.000000, 0.000000)'
+
+        .. warning::
+
+            Only ``POINT`` (2/3D) are supported, ``POINTM`` and ``POINT`` with:
+            ``XYZM`` are not supported yet.
         """
-        return "POINT(%s)" % ', '.join(['%f' % coord for coord in self.coords()])
+        return "POINT(%s)" % ', '.join(['%f' % coord
+                                        for coord in self.coords()])
 
     def get_wkb(self):
         """Return a "well know binary" (WKB) geometry buffer"""
@@ -262,7 +264,8 @@ class Point(object):
 
     def distance(self, pnt):
         """Calculate distance of 2 points, using the Vect_points_distance
-        C function, If one of the point have z == None, return the 2D distance. ::
+        C function, If one of the point have z == None, return the 2D distance.
+        ::
 
             >>> pnt0 = Point(0, 0, 0)
             >>> pnt1 = Point(1, 0)
@@ -273,6 +276,9 @@ class Point(object):
             Point(1.000000, 0.000000, 1.000000)
             >>> pnt0.distance(pnt1)
             1.4142135623730951
+
+        The distance method require a :class:Point or a tuple with
+        the coordinates.
         """
         if self.is2D or pnt.is2D:
             return libvect.Vect_points_distance(self.x, self.y, 0,
@@ -281,35 +287,14 @@ class Point(object):
             return libvect.Vect_points_distance(self.x, self.y, self.z,
                                                 pnt.x, pnt.y, pnt.z, 1)
 
-
     def buffer(self, dist=None, dist_x=None, dist_y=None, angle=0,
                round_=True, tol=0.1):
-        """Return an Area object using the Vect_point_buffer2 C function.
-        void Vect_point_buffer2(double px,
-                                double py,
-                                double da,
-                                double db,
-                                double dalpha,
-                                int    round,
-                                double tol,
-                                struct line_pnts **oPoints)
-            Creates buffer around the point (px, py).
-
-        Parameters
-        -----------
-
-        px	input point x-coordinate
-        py	input point y-coordinate
-        da	distance along major axis
-        da	distance along minor axis
-        dalpha	angle between 0x and major axis
-        round	make corners round
-        tol	maximum distance between theoretical arc and output segments
-        [out]	nPoints	output polygon outer border (ccw order)
+        """Return an Area object using the ``Vect_point_buffer2`` C function.
+        Creates buffer around the point (px, py).
         """
         print "Not implemented yet"
         raise
-        if dist != None:
+        if dist is not None:
             dist_x = dist
             dist_y = dist
         area = Area()
@@ -320,15 +305,8 @@ class Point(object):
         return area
 
 
-
-
-
 class Line(object):
-    """
-    Examples
-    ----------
-
-    Instantiate a new Line with a list of tuple, or with a list of Point. ::
+    """Instantiate a new Line with a list of tuple, or with a list of Point. ::
 
         >>> line = Line([(0, 0), (1, 1), (2, 0), (1, -1)])
         >>> line                               #doctest: +NORMALIZE_WHITESPACE
@@ -337,14 +315,15 @@ class Line(object):
               Point(2.000000, 0.000000),
               Point(1.000000, -1.000000)])
 
+    ..
     """
-    def __init__(self, points = None, mapinfo=None, lineid=None, field=None,
-                 is2D = True):
+    def __init__(self, points=None, mapinfo=None, lineid=None, field=None,
+                 is2D=True):
         self.c_points = libvect.line_pnts()
         self.map = mapinfo
         self.lineid = lineid
         self.field = field
-        if points != None:
+        if points is not None:
             for pnt in points:
                 self.append(pnt)
 
@@ -366,23 +345,23 @@ class Line(object):
         #TODO:
         # line[0].x = 10 is not working
         #pnt.c_px = ctypes.pointer(self.c_points.x[indx])
-        #pnt.c_px = ctypes.cast(id(self.c_points.x[indx]), ctypes.POINTER(ctypes.c_double))
-        if isinstance( key, slice ) :
+        # pnt.c_px = ctypes.cast(id(self.c_points.x[indx]),
+        # ctypes.POINTER(ctypes.c_double))
+        if isinstance(key, slice):
             #import pdb; pdb.set_trace()
             #Get the start, stop, and step from the slice
             return [Point(self.c_points.x[indx], self.c_points.y[indx],
-                     None if self.is2D else self.c_points.z[indx]) \
-                     for indx in xrange(*key.indices(len(self)))]
-        elif isinstance( key, int ) :
-            if key < 0 : #Handle negative indices
+                          None if self.is2D else self.c_points.z[indx])
+                    for indx in xrange(*key.indices(len(self)))]
+        elif isinstance(key, int):
+            if key < 0:  # Handle negative indices
                 key += self.c_points.n_points
             if key >= self.c_points.n_points:
                 raise IndexError('Index out of range')
             return Point(self.c_points.x[key], self.c_points.y[key],
-                     None if self.is2D else self.c_points.z[key])
+                         None if self.is2D else self.c_points.z[key])
         else:
             raise ValueError("Invalid argument type: %r." % key)
-
 
     def __setitem__(self, indx, pnt):
         """Change the coordinate of point. ::
@@ -391,14 +370,11 @@ class Line(object):
             >>> line[0] = (2, 2)
             >>> line
             Line([Point(2.000000, 2.000000), Point(1.000000, 1.000000)])
-
         """
         x, y, z = get_xyz(pnt)
         self.c_points.x[indx] = x
         self.c_points.y[indx] = y
         self.c_points.z[indx] = z
-
-
 
     def __iter__(self):
         """Return a Point generator of the Line"""
@@ -418,11 +394,11 @@ class Line(object):
         return "Line([%s])" % ', '.join([repr(pnt) for pnt in self.__iter__()])
 
 #    def __del__(self):
-#        """Frees all memory associated with a line_pnts structure, including the structure itself.
+# """Frees all memory associated with a line_pnts structure, including the
+# structure itself.
 #        void 	Vect_destroy_line_struct (struct line_pnts *p)
 #        """
 #        libvect.Vect_destroy_line_struct(ctypes.byref(self.c_points))
-
 
     def get_pnt(self, distance, angle=0, slope=0):
         """Return a Point object on line in the specified distance, using the
@@ -436,12 +412,12 @@ class Line(object):
             ValueError: The distance exceed the lenght of the line, that is: 1.414214
             >>> line.get_pnt(1)
             Point(0.707107, 0.707107)
-
         """
         # instantiate an empty Point object
         maxdist = self.length()
         if distance > maxdist:
-            raise ValueError("The distance exceed the lenght of the line, that is: %f" % maxdist)
+            str_err = "The distance exceed the lenght of the line, that is: %f"
+            raise ValueError(str_err % maxdist)
         pnt = Point(0, 0, -9999)
         libvect.Vect_point_on_line(ctypes.byref(self.c_points), distance,
                                    pnt.c_px, pnt.c_py, pnt.c_pz,
@@ -449,10 +425,9 @@ class Line(object):
         pnt.is2D = self.is2D
         return pnt
 
-
     def append(self, pnt):
         """Appends one point to the end of a line, using the
-        `Vect_append_point` C function. ::
+        ``Vect_append_point`` C function. ::
 
             >>> line = Line()
             >>> line.append((10, 100))
@@ -462,13 +437,14 @@ class Line(object):
             >>> line
             Line([Point(10.000000, 100.000000), Point(20.000000, 200.000000)])
 
+        Like python list.
         """
         x, y, z = get_xyz(pnt)
         libvect.Vect_append_point(ctypes.byref(self.c_points), x, y, z)
 
-
     def bbox(self):
-        """Return the bounding box of the line, using `Vect_line_box` C function. ::
+        """Return the bounding box of the line, using ``Vect_line_box``
+        C function. ::
 
             >>> line = Line([(0, 0), (0, 1), (2, 1), (2, 0)])
             >>> bbox = line.bbox()
@@ -484,12 +460,14 @@ class Line(object):
             0.0
             >>> bbox.bottom
             0.0
+
+        It is possible to access to the C struct of the object with:
+        ``bbox.c_bbox``
         """
         bbox = Bbox()
         libvect.Vect_line_box(ctypes.byref(self.c_points),
                               ctypes.byref(bbox.c_bbox))
         return bbox
-
 
     def extend(self, line, forward=True):
         """Appends points to the end of a line.
@@ -507,6 +485,9 @@ class Line(object):
                   Point(1.000000, 1.000000),
                   Point(2.000000, 2.000000),
                   Point(3.000000, 3.000000)])
+
+        Like python list, it is possible to extend a line, with another line
+        or with a list of points.
         """
         # set direction
         if forward:
@@ -527,17 +508,19 @@ class Line(object):
         libvect.Vect_append_points(ctypes.byref(self.c_points),
                                    ctypes.byref(c_points), direction)
 
-
     def insert(self, indx, pnt):
         """Insert new point at index position and move all old points at
-        that position and above up, using `Vect_line_insert_point` C function.
-        ::
+        that position and above up, using ``Vect_line_insert_point``
+        C function. ::
+
             >>> line = Line([(0, 0), (1, 1)])
             >>> line.insert(0, Point(1.000000, -1.000000) )
             >>> line                           #doctest: +NORMALIZE_WHITESPACE
             Line([Point(1.000000, -1.000000),
                   Point(0.000000, 0.000000),
                   Point(1.000000, 1.000000)])
+
+        ..
         """
         if indx < 0:  # Handle negative indices
             indx += self.c_points.n_points
@@ -547,7 +530,6 @@ class Line(object):
         libvect.Vect_line_insert_point(ctypes.byref(self.c_points),
                                        indx, x, y, z)
 
-
     def length(self):
         """Calculate line length, 3D-length in case of 3D vector line, using
         `Vect_line_length` C function.  ::
@@ -555,6 +537,8 @@ class Line(object):
             >>> line = Line([(0, 0), (1, 1), (0, 1)])
             >>> line.length()
             2.414213562373095
+
+        ..
         """
         return libvect.Vect_line_length(ctypes.byref(self.c_points))
 
@@ -565,21 +549,20 @@ class Line(object):
             >>> line = Line([(0, 0), (1, 1), (0, 1)])
             >>> line.length_geodesic()
             2.414213562373095
+
+        ..
         """
         return libvect.Vect_line_geodesic_length(ctypes.byref(self.c_points))
 
     def distance(self, pnt):
         """Return a tuple with:
+
             * the closest point on the line,
             * the distance between these two points,
             * distance of point from segment beginning
             * distance of point from line
 
-        Vect_line_distance (const struct line_pnts *points,
-                            double ux, double uy, double uz, int with_z,
-                            double *px, double *py, double *pz,
-                            double *dist, double *spdist, double *lpdist)
-
+        The distance is compute using the ``Vect_line_distance`` C function.
         """
         # instantite outputs
         cx = ctypes.c_double(0)
@@ -590,17 +573,19 @@ class Line(object):
         lp_dist = ctypes.c_double(0)
 
         libvect.Vect_line_distance(ctypes.byref(self.c_points),
-                pnt.x,  pnt.y, pnt.z, 0 if self.is2D else 1,
-                ctypes.byref(cx), ctypes.byref(cy), ctypes.byref(cz),
-                ctypes.byref(dist), ctypes.byref(sp_dist), ctypes.byref(lp_dist))
+                                   pnt.x, pnt.y, pnt.z, 0 if self.is2D else 1,
+                                   ctypes.byref(cx), ctypes.byref(cy),
+                                   ctypes.byref(cz), ctypes.byref(dist),
+                                   ctypes.byref(sp_dist),
+                                   ctypes.byref(lp_dist))
         # instantiate the Point class
         point = Point(cx.value, cy.value, cz.value)
         point.is2D = self.is2D
         return point, dist, sp_dist, lp_dist
 
     def get_first_cat(self):
-        """Fetches FIRST category number for given vector line and field.
-        int 	Vect_get_line_cat (const struct Map_info *Map, int line, int field)
+        """Fetches FIRST category number for given vector line and field, using
+        the ``Vect_get_line_cat`` C function.
         """
         libvect.Vect_get_line_cat(self.map, self.lineid, self.field)
         pass
@@ -614,8 +599,10 @@ class Line(object):
             Point(1.000000, 1.000000)
             >>> line
             Line([Point(0.000000, 0.000000), Point(2.000000, 2.000000)])
+
+        ..
         """
-        if indx < 0 : #Handle negative indices
+        if indx < 0:  # Handle negative indices
             indx += self.c_points.n_points
         if indx >= self.c_points.n_points:
             raise IndexError('Index out of range')
@@ -631,13 +618,13 @@ class Line(object):
             >>> line
             Line([Point(0.000000, 0.000000), Point(1.000000, 1.000000)])
 
+        ..
         """
-        if indx < 0 : #Handle negative indices
+        if indx < 0:  # Handle negative indices
             indx += self.c_points.n_points
         if indx >= self.c_points.n_points:
             raise IndexError('Index out of range')
         libvect.Vect_line_delete_point(ctypes.byref(self.c_points), indx)
-
 
     def prune(self):
         """Remove duplicate points, i.e. zero length segments, using
@@ -650,14 +637,13 @@ class Line(object):
                   Point(1.000000, 1.000000),
                   Point(2.000000, 2.000000)])
 
+        ..
         """
         libvect.Vect_line_prune(ctypes.byref(self.c_points))
 
     def prune_thresh(self, threshold):
-        """Remove points in threshold.
-        Vect_line_prune_thresh (struct line_pnts *Points, double threshold)
-
-        """
+        """Remove points in threshold, using the ``Vect_line_prune_thresh``
+        C funtion."""
         libvect.Vect_line_prune(ctypes.byref(self.c_points), threshold)
 
     def remove(self, pnt):
@@ -669,13 +655,14 @@ class Line(object):
             >>> line[-1]
             Point(1.000000, 1.000000)
 
+        ..
         """
         for indx, point in enumerate(self.__iter__()):
             if pnt == point:
-                libvect.Vect_line_delete_point(ctypes.byref(self.c_points), indx)
+                libvect.Vect_line_delete_point(
+                    ctypes.byref(self.c_points), indx)
                 return
         raise ValueError('list.remove(x): x not in list')
-
 
     def reverse(self):
         """Reverse the order of vertices, using `Vect_line_reverse`
@@ -688,15 +675,12 @@ class Line(object):
                   Point(1.000000, 1.000000),
                   Point(0.000000, 0.000000)])
 
+        ..
         """
         libvect.Vect_line_reverse(ctypes.byref(self.c_points))
 
     def segment(self, start, end):
-        """Create line segment.
-        Vect_line_segment(const struct line_pnts *InPoints,
-                          double start, double end,
-                          struct line_pnts *OutPoints)
-        """
+        """Create line segment. using the ``Vect_line_segment`` C function."""
         line = Line()
         libvect.Vect_line_segment(ctypes.byref(self.c_points), start, end,
                                   ctypes.byref(line.c_points))
@@ -708,6 +692,8 @@ class Line(object):
             >>> line = Line([(0, 0), (1, 1), (2, 0), (1, -1)])
             >>> line.tolist()
             [(0.0, 0.0), (1.0, 1.0), (2.0, 0.0), (1.0, -1.0)]
+
+        .. dummmy
         """
         return [pnt.coords() for pnt in self.__iter__()]
 
@@ -720,6 +706,8 @@ class Line(object):
                    [ 1.,  1.],
                    [ 2.,  0.],
                    [ 1., -1.]])
+
+        ..
         """
         return np.array(self.tolist())
 
@@ -728,10 +716,12 @@ class Line(object):
 
             >>> line = Line([(0, 0), (1, 1), (1, 2)])
             >>> line.get_wkt()
-            'LINESTRIG(0.000000 0.000000, 1.000000 1.000000, 1.000000 2.000000)'
+            'LINESTRING(0.000000 0.000000, 1.000000 1.000000, 1.000000 2.000000)'
+
+        ..
         """
-        return "LINESTRIG(%s)" % ', '.join([
-               ' '.join(['%f' % coord for coord in pnt.coords()]) \
+        return "LINESTRING(%s)" % ', '.join([
+               ' '.join(['%f' % coord for coord in pnt.coords()])
                for pnt in self.__iter__()])
 
     def from_wkt(self, wkt):
@@ -743,47 +733,38 @@ class Line(object):
             Line([Point(0.000000, 0.000000),
                   Point(1.000000, 1.000000),
                   Point(1.000000, 2.000000)])
+
+        ..
         """
         match = re.match('LINESTRING\((.*)\)', wkt)
         if match:
             self.reset()
             for coord in match.groups()[0].strip().split(','):
-                self.append( tuple([float(e) for e in coord.split(' ')]) )
+                self.append(tuple([float(e) for e in coord.split(' ')]))
         else:
             return None
 
     def get_wkb(self):
         pass
 
+    def buffer(self, dist=None, dist_x=None, dist_y=None,
+               angle=0, round_=True, tol=0.1):
+        """Return the buffer area around the line, using the
+        ``Vect_line_buffer2`` C function.
 
-    def buffer(self, dist=None, dist_x=None, dist_y=None, angle=0,
-               round_=True, tol=0.1):
+        .. warning::
+            Not implemented yet.
         """
-        Vect_line_buffer2
-
-        Parameters
-        -----------
-
-        da	distance along major axis
-        da	distance along minor axis
-        dalpha	angle between 0x and major axis
-        round	make corners round
-        tol	maximum distance between theoretical arc and output segments
-
-        [out]	oPoints	output polygon outer border (ccw order)
-        [out]	inner_count	number of holes
-        [out]	iPoints	array of output polygon's holes (cw order)
-        """
-        if dist != None:
+        if dist is not None:
             dist_x = dist
             dist_y = dist
         area = Area()
         libvect.Vect_line_buffer2(ctypes.byref(self.c_points),
                                   dist_x, dist_y,
-                                   angle, int(round_), tol,
-                                   area.boundary.c_points,
-                                   area.isles.c_points,
-                                   area.num_isles)
+                                  angle, int(round_), tol,
+                                  area.boundary.c_points,
+                                  area.isles.c_points,
+                                  area.num_isles)
         return area
 
     def reset(self):
@@ -797,9 +778,10 @@ class Line(object):
             0
             >>> line
             Line([])
+
+        ..
         """
         libvect.Vect_reset_line(ctypes.byref(self.c_points))
-
 
 
 class Boundary(Line):
@@ -813,6 +795,7 @@ class Boundary(Line):
         # geometry type
         self.gtype = 'boundary'
 
+
 class Centroid(Point):
     """
     ['Vect_attach_centroids',
@@ -823,6 +806,7 @@ class Centroid(Point):
     def __init__(self):
         # geometry type
         self.gtype = 'centroid'
+
 
 class Isle(object):
     """
@@ -845,6 +829,7 @@ class Isle(object):
     """
     pass
 
+
 class Area(object):
     """
      'Vect_build_line_area',
@@ -866,7 +851,6 @@ class Area(object):
      'Vect_select_areas_by_box',
      'Vect_select_areas_by_polygon']
     """
-
 
     def __init__(self):
         #self.boundary
@@ -935,12 +919,14 @@ class Area(object):
     def boundaries(self):
         """Creates list of boundaries for given area.
 
-        int Vect_get_area_boundaries(const struct Map_info *Map, int area, struct ilist *List)
+        int Vect_get_area_boundaries(const struct Map_info *Map,
+                                     int area, struct ilist *List)
         """
 
     def cats(self):
         """Get area categories.
-        int Vect_get_area_cats (const struct Map_info *Map, int area, struct line_cats *Cats)
+        int Vect_get_area_cats (const struct Map_info *Map,
+                                int area, struct line_cats *Cats)
         """
         pass
 
@@ -953,7 +939,9 @@ class Area(object):
 
     def contain_pnt(self):
         """Check if point is in area.
-        int Vect_point_in_area(double x, double y, const struct Map_info *Map, int area, struct bound_box box)
+        int Vect_point_in_area(double x, double y,
+                               const struct Map_info *Map,
+                               int area, struct bound_box box)
         """
         pass
 
@@ -973,19 +961,22 @@ class Area(object):
 
     def points(self):
         """Returns polygon array of points (outer ring) of given area.
-        int 	Vect_get_area_points (const struct Map_info *Map, int area, struct line_pnts *BPoints)
+        int 	Vect_get_area_points (const struct Map_info *Map,
+                                   int area, struct line_pnts *BPoints)
         """
         pass
 
     def isles_boundary(self):
         """Creates list of boundaries for given isle.
 
-        int Vect_get_isle_boundaries (const struct Map_info *Map, int isle, struct ilist *List)
+        int Vect_get_isle_boundaries (const struct Map_info *Map,
+                                      int isle, struct ilist *List)
         """
 
     def isles_points(self):
         """Returns polygon array of points for given isle.
-        int 	Vect_get_isle_points (const struct Map_info *Map, int isle, struct line_pnts *BPoints)
+        int 	Vect_get_isle_points(const struct Map_info *Map,
+                                    int isle, struct line_pnts *BPoints)
         """
         pass
 
@@ -1009,4 +1000,3 @@ class Area(object):
         int 	Vect_get_isle_area (const struct Map_info *Map, int isle)
         """
         pass
-
