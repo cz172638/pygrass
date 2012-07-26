@@ -4,8 +4,8 @@ Created on Wed Jul 18 10:46:25 2012
 
 @author: pietro
 """
-import grass.lib.gis as libgis
-libgis.G_gisinit('')
+#import grass.lib.gis as libgis
+#libgis.G_gisinit('')
 import ctypes
 import grass.lib.vector as libvect
 #from vector_type import VTYPE
