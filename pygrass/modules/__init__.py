@@ -4,58 +4,6 @@ Created on Thu Jul 12 10:23:15 2012
 
 @author: pietro
 
-
-Example:
-import grass.modules as modules
-
-1) Running r.slope.aspect
-rsa = modules.factory("r.slope.aspect", elevation=elev, slope='slp_f',
-...                           format='percent', overwrite=True)
-
-2) Creating a run-able module object and run later
-rsa = modules.factory("r.slope.aspect", elevation='elev', slope='slp_f',
-...                           format='percent', flags='g',
-overwrite=True, run=False)
-rsa.run()
-# or for cluster environments of wps server
-rsa.remote_run(node="cluster_node_3")
-
-3) Creating a module object and run later with arguments
-rsa = modules.factory("r.slope.aspect")
-rsa.run(elevation='elev', slope='slp_f', format='percent', flags='g',
-overwrite=True)
-
-4) Create the module object input step by step and run later
-rsa = modules.factory("r.slope.aspect")
-rsa.inputs["elevation"] = "elev"
-rsa.inputs["format"] = 'percent'
-rsa.outputs["slope"] = "slp_f"
-rsa.flags = "g"
-rsa.overwrite = True
-rsa.run()
-
-# For all above:
-
-if rsa.return_state == 0:
-    print "Run successfully"
-    print rsa.stdout
-    print rsa.stderr
-
-# print some metadata
-
-print rsa.name
-print rsa.description
-print rsa.keywords
-print rsa.inputs
-print rsa.inputs["elev"].description
-print rsa.inputs["elev"].type
-print rsa.inputs["elev"].multiple
-print rsa.inputs["elev"].required
-print rsa.outputs
-...
-
-if rsa.outputs["aspect"] == None:
-    print "Aspect is not computed"
 """
 from __future__ import print_function
 import subprocess
@@ -63,6 +11,7 @@ import collections
 from itertools import izip_longest
 from xml.etree.ElementTree import fromstring
 import numpy as np
+import grass
 
 
 #
@@ -76,101 +25,130 @@ import numpy as np
 # and then we call f(p)
 #
 _GETFROMTAG = {
-'description' : lambda p: p.text.strip(),
-'keydesc'     : lambda p: p.text.strip(),
-'gisprompt'   : lambda p: dict(p.items()),
-'default'     : lambda p: p.text.strip(),
-'values'      : lambda p: [e.text.strip() for e in p.findall('value/name')],
-'value'       : lambda p: None,
-'guisection'  : lambda p: p.text.strip(),
-'label'       : lambda p: p.text.strip(),
-'suppress_required' : lambda p: None,
-'keywords'    : lambda p: p.text.strip(),
+    'description': lambda p: p.text.strip(),
+    'keydesc': lambda p: p.text.strip(),
+    'gisprompt': lambda p: dict(p.items()),
+    'default': lambda p: p.text.strip(),
+    'values': lambda p: [e.text.strip() for e in p.findall('value/name')],
+    'value': lambda p: None,
+    'guisection': lambda p: p.text.strip(),
+    'label': lambda p: p.text.strip(),
+    'suppress_required': lambda p: None,
+    'keywords': lambda p: p.text.strip(),
 }
 
 _GETTYPE = {
-'string' : str,
-'integer': np.int32,
-'float'  : np.float32,
-'double' : np.float64,
+    'string': str,
+    'integer': np.int32,
+    'float': np.float32,
+    'double': np.float64,
 }
 
-class ParameterError(Exception): pass
-class FlagError(Exception): pass
+
+def stdout2dict(stdout, sep='=', default=None, val_type=None, vsep=None):
+    """Return a dictionary where entries are separated
+    by newlines and the key and value are separated by `sep' (default: `=').
+    Use the grass.core.parse_key_val function
+
+    sep: key/value separator
+    default: default value to be used
+    val_type: value type (None for no cast)
+    vsep: vertical separator (default os.linesep)
+    """
+    return grass.script.core.parse_key_val(stdout, sep, default,
+                                           val_type, vsep)
+
+
+class ParameterError(Exception):
+    pass
+
+
+class FlagError(Exception):
+    pass
+
 
 def _element2dict(xparameter):
     diz = dict(xparameter.items())
     for p in xparameter:
-        if _GETFROMTAG.has_key(p.tag):
+        if p.tag in _GETFROMTAG:
             diz[p.tag] = _GETFROMTAG[p.tag](p)
         else:
-            print('New tag: %s, ignored' % p.tag )
+            print('New tag: %s, ignored' % p.tag)
     return diz
 
 # dictionary used to create docstring for the objects
 _DOC = {
-#------------------------------------------------------------
-# head
-'head' : """{cmd_name}({cmd_params})
+    #------------------------------------------------------------
+    # head
+    'head': """{cmd_name}({cmd_params})
 
 Parameters
 ----------
 
 """,
-#------------------------------------------------------------
-# param
-'param' : """{name}: {default}{required}{multi}{ptype}
+    #------------------------------------------------------------
+    # param
+    'param': """{name}: {default}{required}{multi}{ptype}
     {description}{values}""",
-#------------------------------------------------------------
-# flag_head
-'flag_head' : """
+    #------------------------------------------------------------
+    # flag_head
+    'flag_head': """
 Flags
 ------
 """,
-#------------------------------------------------------------
-# flag
-'flag' : """{name}: {default}
+    #------------------------------------------------------------
+    # flag
+    'flag': """{name}: {default}
     {description}""",
-#------------------------------------------------------------
-# foot
-'foot' : """run: True, optional
+    #------------------------------------------------------------
+    # foot
+    'foot': """
+Special Parameters
+------------------
+
+The Module class have some optional parameters which are distinct using a final
+underscore.
+
+run_: True, optional
     If True execute the module.
-stdin: PIPE,
+finish_: True, optional
+    If True wait untill the end of the module execution, and store the module
+    outputs into stdout, stderr attributes of the class.
+stdin_: PIPE,
     Set the standard input
-stdout: PIPE
-    Set the standard output
-stderr: PIPE
-    Set the standard error"""}
+"""}
 
 
 class Parameter(object):
 
-    def __init__(self, xparameter = None, diz = None):
+    def __init__(self, xparameter=None, diz=None):
         self._value = None
-        diz = _element2dict(xparameter) if xparameter != None else diz
-        if diz == None: raise TypeError('Xparameter or diz are required')
+        diz = _element2dict(xparameter) if xparameter is not None else diz
+        if diz is None:
+            raise TypeError('Xparameter or diz are required')
         self.name = diz['name']
         self.required = True if diz['required'] == 'yes' else False
         self.multiple = True if diz['multiple'] == 'yes' else False
         # check the type
-        if _GETTYPE.has_key(diz['type']):
+        if diz['type'] in _GETTYPE:
             self.type = _GETTYPE[diz['type']]
             self.typedesc = diz['type']
             self._type = _GETTYPE[diz['type']]
         else:
-            raise TypeError('New type: %s, ignored' % diz['type'] )
+            raise TypeError('New type: %s, ignored' % diz['type'])
 
         self.description = diz['description']
-        self.keydesc = diz['keydesc'] if diz.has_key('keydesc') else None
-        self.values = [self._type(i) for i in diz['values']] if diz.has_key('values') else None
-        self.default = self._type(diz['default']) if diz.has_key('default') else None
-        self.guisection = diz['guisection'] if diz.has_key('guisection') else None
-        if diz.has_key('gisprompt'):
+        self.keydesc = diz['keydesc'] if 'keydesc' in diz else None
+        self.values = [self._type(
+            i) for i in diz['values']] if 'values' in diz else None
+        self.default = self._type(
+            diz['default']) if 'default' in diz else None
+        self.guisection = diz['guisection'] if 'guisection' in diz else None
+        if 'gisprompt' in diz:
             self.type = diz['gisprompt']['prompt']
             self.input = False if diz['gisprompt']['age'] == 'new' else True
         else:
             self.input = True
-
 
     def _get_value(self):
         return self._value
@@ -179,37 +157,42 @@ class Parameter(object):
         if isinstance(value, list) or isinstance(value, tuple):
             if self.multiple:
                 # check each value
-                self._value = [val for val in value if isinstance(value, self._type)]
+                self._value = [
+                    val for val in value if isinstance(value, self._type)]
             else:
-                raise TypeError('The Parameter <%s>, not support multiple inputs' % self.name)
+                str_err = 'The Parameter <%s>, not support multiple inputs'
+                raise TypeError(str_err % self.name)
         elif isinstance(value, self._type):
             if self.values:
                 if value in self.values:
                     self._value = value
                 else:
-                    raise ValueError('The Parameter <%s>, must be one of: %r' % (self.name, self.values))
+                    raise ValueError('The Parameter <%s>, must be one of: %r' %
+                                     (self.name, self.values))
             else:
                 self._value = value
         else:
-            raise TypeError('The Parameter <%s>, require: %s' % (self.name, self.typedesc))
+            raise TypeError('The Parameter <%s>, require: %s' %
+                            (self.name, self.typedesc))
 
     # here the property function is used to transform value in an attribute
     # in this case we define which function must be use to get/set the value
-    value = property(fget = _get_value, fset = _set_value)
-
+    value = property(fget=_get_value, fset=_set_value)
 
     def __str__(self):
         if isinstance(self._value, list) or isinstance(self._value, tuple):
-            value = ','.join([ str(v) for v in self._value])
+            value = ','.join([str(v) for v in self._value])
         else:
             value = str(self._value)
         return "%s=%s" % (self.name, value)
 
     def __repr__(self):
-        return "Parameter <%s> (required:%s, type:%s, multiple:%s)" % (self.name,
-               "yes" if self.required else "no",
-               self.type if self.type in ('raster', 'vector') else self.typedesc,
-               "yes" if self.multiple else "no")
+        str_repr = "Parameter <%s> (required:%s, type:%s, multiple:%s)"
+        return str_repr % (self.name,
+                           "yes" if self.required else "no",
+                           self.type if self.type in (
+                           'raster', 'vector') else self.typedesc,
+                           "yes" if self.multiple else "no")
 
     # here we use property with a decorator, in this way we mask a method as
     # a class attribute
@@ -219,14 +202,14 @@ class Parameter(object):
 
         {name}: {default}{required}{multi}{ptype}
             {description}{values}"","""
-        return _DOC['param'].format(name = self.name,
-               default = repr(self.default) + ', ' if self.default else '',
-               required = 'required, ' if self.required else 'optional, ',
-               multi = 'multi' if self.multiple else '',
-               ptype = self.typedesc, description = self.description,
-               values = '\n    Values: {vls}'.format(
-                        vls = ', '.join([repr(val) for val in self.values]))
-                        if self.values else '')
+        return _DOC['param'].format(name=self.name,
+                default=repr(self.default) + ', ' if self.default else '',
+                required='required, ' if self.required else 'optional, ',
+                multi='multi' if self.multiple else '',
+                ptype=self.typedesc, description=self.description,
+                values='\n    Values: {0}'.format(', '.join([repr(val)
+                                                  for val in self.values]))
+                       if self.values else '')
 
 
 class TypeDict(collections.OrderedDict):
@@ -238,25 +221,29 @@ class TypeDict(collections.OrderedDict):
         if isinstance(value, self.type):
             super(TypeDict, self).__setitem__(key, value)
         else:
-            cl = repr(self.type).strip().replace("'",'').replace('>','').split('.')
-            raise TypeError('The value: %r is not a %s object' % (value, cl[-1].title()))
+            cl = repr(self.type).translate(None, "'<> ").split('.')
+            str_err = 'The value: %r is not a %s object'
+            raise TypeError(str_err % (value, cl[-1].title()))
 
     @property
     def __doc__(self):
-        return '\n'.join([self.__getitem__(obj).__doc__ for obj in self.__iter__()])
+        return '\n'.join([self.__getitem__(obj).__doc__
+                          for obj in self.__iter__()])
 
     def __call__(self):
         return [self.__getitem__(obj) for obj in self.__iter__()]
 
+
 class Flag(object):
-    def __init__(self, xflag = None, diz = None):
+    def __init__(self, xflag=None, diz=None):
         self.value = None
-        diz = _element2dict(xflag) if xflag != None else diz
+        diz = _element2dict(xflag) if xflag is not None else diz
         self.name = diz['name']
-        self.special = True if self.name in ('verbose', 'overwrite', 'quiet', 'run') else False
+        self.special = True if self.name in (
+            'verbose', 'overwrite', 'quiet', 'run') else False
         self.description = diz['description']
-        self.default = diz['default'] if diz.has_key('default') else None
-        self.guisection = diz['guisection'] if diz.has_key('guisection') else None
+        self.default = diz['default'] if 'default' in diz else None
+        self.guisection = diz['guisection'] if 'guisection' in diz else None
 
     def __str__(self):
         if self.value:
@@ -275,12 +262,69 @@ class Flag(object):
         """
         {name}: {default}
             {description}"""
-        return _DOC['flag'].format(name = self.name,
-               default = repr(self.default), description = self.description)
+        return _DOC['flag'].format(name=self.name,
+                                   default=repr(self.default),
+                                   description=self.description)
 
 
-class Factory(object):
+class Module(object):
+    """
 
+    Python allow developers to not specify all the arguments and
+    keyword arguments of a method or function.
+
+    ::
+
+        def f(*args):
+            for arg in args:
+                print arg
+
+    therefore if we call the function like: ::
+
+        >>> f('grass', 'gis', 'modules')
+        grass
+        gis
+        modules
+
+    or we can define a new list: ::
+
+        >>> words = ['grass', 'gis', 'modules']
+        >>> f(*words)
+        grass
+        gis
+        modules
+
+    we can do the same with keyword arguments, rewrite the above function: ::
+
+        def f(*args, **kargs):
+            for arg in args:
+                print arg
+            for key, value in kargs.items():
+                print "%s = %r" % (key, value)
+
+    now we can use the new function, with: ::
+
+        >>> f('grass', 'gis', 'modules', os = 'linux', language = 'python')
+        grass
+        gis
+        modules
+        os = 'linux'
+        language = 'python'
+
+    or, as before we can, define a dictionary and give the dictionary to
+    the function, like: ::
+
+        >>> keywords = {'os' : 'linux', 'language' : 'python'}
+        >>> f(*words, **keywords)
+        grass
+        gis
+        modules
+        os = 'linux'
+        language = 'python'
+
+    In the Module class we heavly use this language feature to pass arguments
+    and keyword arguments to the grass module.
+    """
     def __init__(self, cmd, *args, **kargs):
         self.name = cmd
         # call the command with --interface-description
@@ -324,8 +368,9 @@ class Factory(object):
         # Add new attributes to the class
         #
         self._flags = ''
-        self._run = True
-        self.stdin = subprocess.PIPE
+        self.run_ = True
+        self.finish_ = True
+        self.stdin_ = subprocess.PIPE
         self.stdout = subprocess.PIPE
         self.stderr = subprocess.PIPE
         self.popen = None
@@ -338,17 +383,18 @@ class Factory(object):
 
     def _set_flags(self, value):
         if isinstance(value, str):
-            flgs = [flg for flg in self.flags_dict \
-                         if not self.flags_dict[flg].special ]
-            # we need to check if the flag is valid, special flags are not allow
-            if value in  flgs:
+            flgs = [flg for flg in self.flags_dict
+                    if not self.flags_dict[flg].special]
+            # we need to check if the flag is valid, special flags are not
+            # allow
+            if value in flgs:
                 self._flags = value
             else:
                 raise ValueError('Flag not valid, valid flag are: %r' % flgs)
         else:
             raise TypeError('The flags attribute must be a string')
 
-    flags = property(fget = _get_flags, fset = _set_flags)
+    flags = property(fget=_get_flags, fset=_set_flags)
 
     def __call__(self, *args, **kargs):
         if not args and not kargs:
@@ -357,21 +403,19 @@ class Factory(object):
         #
         # check for extra kargs, set attribute and remove from dictionary
         #
-        if 'run' in kargs:
-            self._run = kargs['run']
-            del(kargs['run'])
         if 'flags' in kargs:
             self.flags = kargs['flags']
             del(kargs['flags'])
-        if 'stdin' in kargs:
-            self.stdin = kargs['stdin']
-            del(kargs['stdin'])
-        if 'stdout' in kargs:
-            self.stdout = kargs['stdout']
-            del(kargs['stdout'])
-        if 'stderr' in kargs:
-            self.stderr = kargs['stderr']
-            del(kargs['stderr'])
+        if 'run_' in kargs:
+            self.run_ = kargs['run_']
+            del(kargs['run_'])
+        if 'stdin_' in kargs:
+            self.stdin_ = kargs['stdin_']
+            del(kargs['stdin_'])
+        if 'finish_' in kargs:
+            self.finish_ = kargs['finish_']
+            del(kargs['finish_'])
+
         #
         # check args
         #
@@ -393,8 +437,9 @@ class Factory(object):
         # check reqire parameters
         #
         for par in self.required:
-            if par.value == None:
-                raise ParameterError("Required parameter <%s> not set." % par.name)
+            if par.value is None:
+                raise ParameterError(
+                    "Required parameter <%s> not set." % par.name)
 
         #
         # check flags parameters
@@ -410,41 +455,41 @@ class Factory(object):
         #
         # check if execute
         #
-        if self._run:
+        if self.run_:
             self.run()
 
     @property
     def __doc__(self):
         """{cmd_name}({cmd_params})
         """
-        head = _DOC['head'].format(cmd_name = self.name,
-               cmd_params = ('\n' + (' ' * (len(self.name) + 1))).join(
-               [', '.join(
-               [str(i) for i in line if i != None])
-               for line in izip_longest(*[iter(self.params_list)]*3)]),)
+        head = _DOC['head'].format(cmd_name=self.name,
+             cmd_params=('\n' +  # go to a new line
+             # give space under the function name
+             (' ' * (len(self.name) + 1))).join([', '.join(
+             # transform each parameter in string
+             [str(param) for param in line if param is not None])
+             # smake a list of parameters with only 3 param per line
+             for line in izip_longest(*[iter(self.params_list)] * 3)]),)
         params = '\n'.join([par.__doc__ for par in self.params_list])
         flags = self.flags_dict.__doc__
         return '\n'.join([head, params, _DOC['flag_head'], flags])
 
-
     def make_cmd(self):
         args = [self.name, ]
         for par in self.params_list:
-            if par.value != None:
+            if par.value is not None:
                 args.append(str(par))
         for flg in self.flags_dict:
-            if self.flags_dict[flg].value != None:
+            if self.flags_dict[flg].value is not None:
                 args.append(str(self.flags_dict[flg]))
         return args
 
-    def run(self, node = None):
+    def run(self, node=None):
         cmd = self.make_cmd()
         #print(repr(cmd))
-        self.popen = subprocess.Popen(cmd, stdin=self.stdin,
-                                      stdout=self.stdout, stderr=self.stderr)
-
-
-
-
-
-#slp = Factory('r.slope.aspect')
+        self.popen = subprocess.Popen(cmd, stdin=self.stdin_,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+        if self.finish_:
+            self.popen.wait()
+            self.stdout, self.stderr = self.popen.communicate()
