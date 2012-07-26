@@ -1,4 +1,7 @@
 *.pyc
 *.pyo
 *~
+.spyder*
+*.zip
+docs/_build/*
 
