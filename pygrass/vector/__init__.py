@@ -6,8 +6,10 @@ Created on Tue Jul 17 08:51:53 2012
 """
 import ctypes
 import grass.lib.vector as libvect
+import grass.lib.gis as libgis
 from vector_type import VTYPE
 import geometry as geo
+from basic import Bbox
 
 
 #=============================================
@@ -16,23 +18,34 @@ import geometry as geo
 
 class Vector(object):
     def __init__(self, name, mapset = ''):
+        #
+        # Set map name and mapset
+        #
         self.name = name
         self.mapset = mapset
-        self._Map_info = libvect.Map_info()
-        self.mapinfo = ctypes.byref(self._Map_info)
+        self.c_mapinfo = ctypes.pointer(libvect.Map_info())
         self._spatial_index = libvect.spatial_index()
         self.topology = False
         self.overwrite = False
 
 
-    def numberof(self, vtype):
+    def number_of(self, vtype):
         """
-        >>> rail = Vector('railroads')
+        >>> rail = Vector('rail')
         >>> rail.open()
-        >>> rail.numberof('line')
+        >>> rail.number_of('line')
         10831
+        >>> municip = Vector('boundary_municp')
+        >>> municip.open(topology=True)
+        >>> municip.number_of('line')
+        0
+        >>> municip.number_of('centroid')
+        3579
+        >>> municip.number_of('boundary')
+        5128
+
         """
-        return libvect.Vect_get_num_primitives(self.mapinfo,
+        return libvect.Vect_get_num_primitives(self.c_mapinfo,
                                                VTYPE[vtype])
 
     def get_line(self, line_id):
@@ -42,7 +55,7 @@ class Vector(object):
         Line(id = 10)
 
         """
-        return geo.Line(mapinfo = self.mapinfo, line_id = line_id)
+        return geo.Line(c_mapinfo = self.c_mapinfo, line_id = line_id)
 
 
     def lines(self):
@@ -51,18 +64,22 @@ class Vector(object):
         >>> for line in rail.lines()
         ...     print line.length()
         """
-        for line_id in self.numberof('line'):
+        for line_id in self.number_of('line'):
             yield self.get_line(line_id)
 
+    def exist():
+        pass
 
+    def isopen():
+        pass
 
-    def open(self, mode = 'r', layer = '0', topology = None, overwrite = None):
-        self.topology = topology if topology != None else self.topology
+    def open(self, mode='r', layer='0', topology=None, overwrite=None):
+        self.topology = topology if topology is not None else self.topology
         if self.topology:
             libvect.Vect_set_open_level(2)
-        self.overwrite = overwrite if overwrite != None else self.overwrite
+        self.overwrite = overwrite if overwrite is not None else self.overwrite
         if mode == 'r':
-            openvect = libvect.Vect_open_old2(self.mapinfo, self.name,
+            openvect = libvect.Vect_open_old2(self.c_mapinfo, self.name,
                                self.mapset, layer)
             if openvect == 1:
                 topology = False
@@ -71,14 +88,16 @@ class Vector(object):
             else:
                 raise
         elif mode == 'w':
-            openvect = libvect.Vect_open_new(self.mapinfo,
-                                             self.name, libvect.WITHOUT_Z)
-            if openvect == -1: raise
+            if libvect.Vect_open_new(self.c_mapinfo,
+                                     self.name, libvect.WITHOUT_Z) == -1:
+                raise  # TODO raise error, somwthing went wrong in GRASS
 
     def close(self):
         pass
 
     def bbox(self):
-        """Vect_get_map_box
+        """Return the BBox of the vecor map
         """
-        pass
+        bbox = Bbox()
+        libvect.Vect_get_map_box(self.c_mapinfo, bbox.c_bbox)
+        return bbox

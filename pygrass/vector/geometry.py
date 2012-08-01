@@ -3,6 +3,7 @@
 Created on Wed Jul 18 10:46:25 2012
 
 @author: pietro
+
 """
 #import grass.lib.gis as libgis
 #libgis.G_gisinit('')
@@ -11,6 +12,8 @@ import grass.lib.vector as libvect
 #from vector_type import VTYPE
 import numpy as np
 import re
+from collections import Iterable
+from basic import Ilist, Bbox
 
 WKT = {  # 'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
        'POINT\((.*)\)': 'point',
@@ -57,58 +60,6 @@ def read_WKB(buff):
     """Read the binary buffer and return a geometry object"""
     pass
 
-
-class Bbox(object):
-    def __init__(self):
-        self.c_bbox = libvect.bound_box()
-
-    def _get_n(self):
-        return self.c_bbox.N
-
-    def _set_n(self, value):
-        self.c_bbox.N = value
-
-    north = property(fget=_get_n, fset=_set_n)
-
-    def _get_s(self):
-        return self.c_bbox.S
-
-    def _set_s(self, value):
-        self.c_bbox.S = value
-
-    south = property(fget=_get_s, fset=_set_s)
-
-    def _get_e(self):
-        return self.c_bbox.E
-
-    def _set_e(self, value):
-        self.c_bbox.E = value
-
-    east = property(fget=_get_e, fset=_set_e)
-
-    def _get_w(self):
-        return self.c_bbox.W
-
-    def _set_w(self, value):
-        self.c_bbox.W = value
-
-    west = property(fget=_get_w, fset=_set_w)
-
-    def _get_t(self):
-        return self.c_bbox.T
-
-    def _set_t(self, value):
-        self.c_bbox.T = value
-
-    top = property(fget=_get_t, fset=_set_t)
-
-    def _get_b(self):
-        return self.c_bbox.B
-
-    def _set_b(self, value):
-        self.c_bbox.B = value
-
-    bottom = property(fget=_get_b, fset=_set_b)
 
 #=============================================
 # GEOMETRY
@@ -317,10 +268,10 @@ class Line(object):
 
     ..
     """
-    def __init__(self, points=None, mapinfo=None, lineid=None, field=None,
+    def __init__(self, points=None, c_mapinfo=None, lineid=None, field=None,
                  is2D=True):
-        self.c_points = libvect.line_pnts()
-        self.map = mapinfo
+        self.c_points = libvect.Vect_new_line_struct()
+        self.c_mapinfo = c_mapinfo
         self.lineid = lineid
         self.field = field
         if points is not None:
@@ -344,22 +295,24 @@ class Line(object):
         """
         #TODO:
         # line[0].x = 10 is not working
-        #pnt.c_px = ctypes.pointer(self.c_points.x[indx])
-        # pnt.c_px = ctypes.cast(id(self.c_points.x[indx]),
+        #pnt.c_px = ctypes.pointer(self.c_points.contents.x[indx])
+        # pnt.c_px = ctypes.cast(id(self.c_points.contents.x[indx]),
         # ctypes.POINTER(ctypes.c_double))
         if isinstance(key, slice):
             #import pdb; pdb.set_trace()
             #Get the start, stop, and step from the slice
-            return [Point(self.c_points.x[indx], self.c_points.y[indx],
-                          None if self.is2D else self.c_points.z[indx])
+            return [Point(self.c_points.contents.x[indx],
+                          self.c_points.contents.y[indx],
+                    None if self.is2D else self.c_points.contents.z[indx])
                     for indx in xrange(*key.indices(len(self)))]
         elif isinstance(key, int):
             if key < 0:  # Handle negative indices
-                key += self.c_points.n_points
-            if key >= self.c_points.n_points:
+                key += self.c_points.contents.n_points
+            if key >= self.c_points.contents.n_points:
                 raise IndexError('Index out of range')
-            return Point(self.c_points.x[key], self.c_points.y[key],
-                         None if self.is2D else self.c_points.z[key])
+            return Point(self.c_points.contents.x[key],
+                         self.c_points.contents.y[key],
+                         None if self.is2D else self.c_points.contents.z[key])
         else:
             raise ValueError("Invalid argument type: %r." % key)
 
@@ -372,9 +325,9 @@ class Line(object):
             Line([Point(2.000000, 2.000000), Point(1.000000, 1.000000)])
         """
         x, y, z = get_xyz(pnt)
-        self.c_points.x[indx] = x
-        self.c_points.y[indx] = y
-        self.c_points.z[indx] = z
+        self.c_points.contents.x[indx] = x
+        self.c_points.contents.y[indx] = y
+        self.c_points.contents.z[indx] = z
 
     def __iter__(self):
         """Return a Point generator of the Line"""
@@ -385,7 +338,7 @@ class Line(object):
 
         int 	Vect_get_num_line_points (const struct line_pnts *Points)
         Get number of line points."""
-        return self.c_points.n_points
+        return self.c_points.contents.n_points
 
     def __str__(self):
         return self.get_wkt()
@@ -419,7 +372,7 @@ class Line(object):
             str_err = "The distance exceed the lenght of the line, that is: %f"
             raise ValueError(str_err % maxdist)
         pnt = Point(0, 0, -9999)
-        libvect.Vect_point_on_line(ctypes.byref(self.c_points), distance,
+        libvect.Vect_point_on_line(self.c_points, distance,
                                    pnt.c_px, pnt.c_py, pnt.c_pz,
                                    angle, slope)
         pnt.is2D = self.is2D
@@ -440,7 +393,7 @@ class Line(object):
         Like python list.
         """
         x, y, z = get_xyz(pnt)
-        libvect.Vect_append_point(ctypes.byref(self.c_points), x, y, z)
+        libvect.Vect_append_point(self.c_points, x, y, z)
 
     def bbox(self):
         """Return the bounding box of the line, using ``Vect_line_box``
@@ -465,8 +418,7 @@ class Line(object):
         ``bbox.c_bbox``
         """
         bbox = Bbox()
-        libvect.Vect_line_box(ctypes.byref(self.c_points),
-                              ctypes.byref(bbox.c_bbox))
+        libvect.Vect_line_box(self.c_points, bbox.c_bbox)
         return bbox
 
     def extend(self, line, forward=True):
@@ -505,8 +457,7 @@ class Line(object):
                 lin.append(pnt)
             c_points = lin.c_points
 
-        libvect.Vect_append_points(ctypes.byref(self.c_points),
-                                   ctypes.byref(c_points), direction)
+        libvect.Vect_append_points(self.c_points, c_points, direction)
 
     def insert(self, indx, pnt):
         """Insert new point at index position and move all old points at
@@ -523,12 +474,11 @@ class Line(object):
         ..
         """
         if indx < 0:  # Handle negative indices
-            indx += self.c_points.n_points
-        if indx >= self.c_points.n_points:
+            indx += self.c_points.contents.n_points
+        if indx >= self.c_points.contents.n_points:
             raise IndexError('Index out of range')
         x, y, z = get_xyz(pnt)
-        libvect.Vect_line_insert_point(ctypes.byref(self.c_points),
-                                       indx, x, y, z)
+        libvect.Vect_line_insert_point(self.c_points, indx, x, y, z)
 
     def length(self):
         """Calculate line length, 3D-length in case of 3D vector line, using
@@ -540,7 +490,7 @@ class Line(object):
 
         ..
         """
-        return libvect.Vect_line_length(ctypes.byref(self.c_points))
+        return libvect.Vect_line_length(self.c_points)
 
     def length_geodesic(self):
         """Calculate line length, usig `Vect_line_geodesic_length` C function.
@@ -552,7 +502,7 @@ class Line(object):
 
         ..
         """
-        return libvect.Vect_line_geodesic_length(ctypes.byref(self.c_points))
+        return libvect.Vect_line_geodesic_length(self.c_points)
 
     def distance(self, pnt):
         """Return a tuple with:
@@ -572,7 +522,7 @@ class Line(object):
         sp_dist = ctypes.c_double(0)
         lp_dist = ctypes.c_double(0)
 
-        libvect.Vect_line_distance(ctypes.byref(self.c_points),
+        libvect.Vect_line_distance(self.c_points,
                                    pnt.x, pnt.y, pnt.z, 0 if self.is2D else 1,
                                    ctypes.byref(cx), ctypes.byref(cy),
                                    ctypes.byref(cz), ctypes.byref(dist),
@@ -603,11 +553,11 @@ class Line(object):
         ..
         """
         if indx < 0:  # Handle negative indices
-            indx += self.c_points.n_points
-        if indx >= self.c_points.n_points:
+            indx += self.c_points.contents.n_points
+        if indx >= self.c_points.contents.n_points:
             raise IndexError('Index out of range')
         pnt = self.__getitem__(indx)
-        libvect.Vect_line_delete_point(ctypes.byref(self.c_points), indx)
+        libvect.Vect_line_delete_point(self.c_points, indx)
         return pnt
 
     def delete(self, indx):
@@ -621,10 +571,10 @@ class Line(object):
         ..
         """
         if indx < 0:  # Handle negative indices
-            indx += self.c_points.n_points
-        if indx >= self.c_points.n_points:
+            indx += self.c_points.contents.n_points
+        if indx >= self.c_points.contents.n_points:
             raise IndexError('Index out of range')
-        libvect.Vect_line_delete_point(ctypes.byref(self.c_points), indx)
+        libvect.Vect_line_delete_point(self.c_points, indx)
 
     def prune(self):
         """Remove duplicate points, i.e. zero length segments, using
@@ -639,12 +589,12 @@ class Line(object):
 
         ..
         """
-        libvect.Vect_line_prune(ctypes.byref(self.c_points))
+        libvect.Vect_line_prune(self.c_points)
 
     def prune_thresh(self, threshold):
         """Remove points in threshold, using the ``Vect_line_prune_thresh``
         C funtion."""
-        libvect.Vect_line_prune(ctypes.byref(self.c_points), threshold)
+        libvect.Vect_line_prune(self.c_points, threshold)
 
     def remove(self, pnt):
         """Delete point at given index and move all points above down, using
@@ -659,8 +609,7 @@ class Line(object):
         """
         for indx, point in enumerate(self.__iter__()):
             if pnt == point:
-                libvect.Vect_line_delete_point(
-                    ctypes.byref(self.c_points), indx)
+                libvect.Vect_line_delete_point(self.c_points, indx)
                 return
         raise ValueError('list.remove(x): x not in list')
 
@@ -677,13 +626,12 @@ class Line(object):
 
         ..
         """
-        libvect.Vect_line_reverse(ctypes.byref(self.c_points))
+        libvect.Vect_line_reverse(self.c_points)
 
     def segment(self, start, end):
         """Create line segment. using the ``Vect_line_segment`` C function."""
         line = Line()
-        libvect.Vect_line_segment(ctypes.byref(self.c_points), start, end,
-                                  ctypes.byref(line.c_points))
+        libvect.Vect_line_segment(self.c_points, start, end, line.c_points)
         return line
 
     def tolist(self):
@@ -759,7 +707,7 @@ class Line(object):
             dist_x = dist
             dist_y = dist
         area = Area()
-        libvect.Vect_line_buffer2(ctypes.byref(self.c_points),
+        libvect.Vect_line_buffer2(self.c_points,
                                   dist_x, dist_y,
                                   angle, int(round_), tol,
                                   area.boundary.c_points,
@@ -781,19 +729,34 @@ class Line(object):
 
         ..
         """
-        libvect.Vect_reset_line(ctypes.byref(self.c_points))
+        libvect.Vect_reset_line(self.c_points)
 
 
-class Boundary(Line):
+
+class Boundary(object):
     """
     ['Vect_get_area_boundaries',
-     'Vect_get_isle_boundaries',
-     'bound_box',
-     'struct_bound_box']
+     'Vect_get_isle_boundaries',]
     """
-    def __init__(self):
+    def __init__(self, area_id, c_mapinfo, lines=None, left=None, right=None):
+        self.area_id = area_id
+        self.c_mapinfo = c_mapinfo
+        self.ilist = Ilist()
+        self.lines = lines
+        if len(lines) != len(left) or len(lines) != len(right):
+            str_err = "Left and right must have the same length of lines"
+            raise ValueError(str_err)
+        self.left = Ilist()
+        self.right = right
         # geometry type
         self.gtype = 'boundary'
+
+    def boundaries(self):
+        """Returna Ilist object with the line id"""
+        bounds = Ilist()
+        libvect.Vect_get_area_boundaries(self.c_mapinfo, self.area_id,
+                                         bounds.c_ilist)
+        return bounds
 
 
 class Centroid(Point):
@@ -823,11 +786,81 @@ class Isle(object):
      'Vect_get_num_islands',
      'Vect_get_point_in_poly_isl',
      'Vect_isle_alive',
-     'Vect_isle_find_area',
      'Vect_point_in_island',
      'Vect_select_isles_by_box']
     """
-    pass
+    def __init__(self, isle_id, c_mapinfo):
+        self.isle_id = isle_id
+        self.c_mapinfo = c_mapinfo
+        #self.area_id = area_id
+
+    def __repr__(self):
+        return "Isle(%d, %d)" % (self.isle_id)
+
+    def boundaries(self):
+        ilist = Ilist()
+        libvect.Vect_get_isle_boundaries(self.c_mapinfo, self.isle_id,
+                                         ilist.c_ilist)
+        return ilist
+
+    def bbox(self):
+        bbox = Bbox()
+        libvect.Vect_get_isle_box(self.c_mapinfo, self.isle_id, bbox.c_bbox)
+        return bbox
+
+    def points(self):
+        """Return a Line object with the outer ring points"""
+        line = Line()
+        libvect.Vect_get_isle_points(self.c_mapinfo, line.c_points)
+        return line
+
+    def points_geos(self):
+        """Return a Line object with the outer ring points
+        """
+        line = Line()
+        libvect.Vect_get_isle_points_geos(self.c_mapinfo, line.c_points)
+        return line
+
+    def area_id(self):
+        """Returns area id for isle."""
+        return libvect.Vect_get_isle_area(self.c_mapinfo, self.isle_id)
+
+    def alive(self):
+        """Check if isle is alive or dead (topology required)"""
+        return bool(libvect.Vect_isle_alive(self.c_mapinfo, self.isle_id))
+
+    def contain_pnt(self, pnt):
+        """Check if point is in area."""
+        bbox = self.bbox()
+        return bool(libvect.Vect_point_in_island(pnt.x, pnt.y,
+                                                 self.c_mapinfo, self.isle_id,
+                                                 bbox.c_bbox.contents))
+
+class Isles(object):
+    def __init__(self, c_mapinfo, area_id):
+        self.c_mapinfo = c_mapinfo
+        self.area_id = area_id
+        self._isles_id = self.get_isles_id()
+        self._isles = self.get_isles()
+
+
+    def __len__(self):
+        return libvect.Vect_get_area_num_isles(self.c_mapinfo, self.area_id)
+
+    def __repr__(self):
+        return "Isles(%r)" % self._isles
+
+    def __getitem__(self, key):
+        return self._isles[key]
+
+    def get_isles_id(self):
+        return [libvect.Vect_get_area_isle(self.c_mapinfo, i)
+                for i in range(self.__len__())]
+
+    def get_isles(self):
+        return [Isle(isle_id, self.c_mapinfo, self.area_id)
+                for isle_id in self._isles_id]
+
 
 
 class Area(object):
@@ -852,11 +885,53 @@ class Area(object):
      'Vect_select_areas_by_polygon']
     """
 
-    def __init__(self):
-        #self.boundary
-        #self.centroid
+    def __init__(self, area_id=None, c_mapinfo=None,
+                 boundary=None, centroid=None, isles=[]):
+        self.area_id = area_id
+        self.c_mapinfo = c_mapinfo
+        self.boundary = self.get_boundary()
+        self.centroid = centroid
+        self.isles = Ilist()
         # geometry type
         self.gtype = 'area'
+
+    def init_from_id(self, area_id=None):
+        """Return an Area object"""
+        if area_id is None and self.area_id is None:
+            raise ValueError("You need to give or set the area_id")
+        self.area_id = area_id if area_id is not None else self.area_id
+        # get boundary
+        self.get_boundary()
+        # get isles
+        self.get_isles()
+        pass
+
+    def boundary(self):
+        """Return a Line object with the outer ring"""
+        line = Line()
+        libvect.Vect_get_area_points(self.c_mapinfo, self.area_id,
+                                     line.c_points)
+        return line
+
+    def centroid(self):
+        centroid_id = libvect.Vect_get_area_centroid(self.c_mapinfo,
+                                                     self.area_id)
+        return Centroid(self.c_mapinfo, centroid)
+
+    def num_isles(self):
+        return libvect.Vect_get_area_num_isles(self.c_mapinfo, self.area_id)
+
+
+    def get_isles(self):
+        """Instantiate the boundary attribute reading area_id"""
+        return Isles(self.c_mapinfo, self.area_id)
+#        num_isles = libvect.Vect_get_area_num_isles(self.c_mapinfo,
+#                                                    self.area_id,)
+#        isles = [libvect.Vect_get_area_isle(self.c_mapinfo, i)
+#                 for i in range(num_isles)]
+#
+#        libvect.Vect_get_isle_boundaries(self.c_mapinfo, isle_id,
+#                                         self.boundary.c_ilist)
 
     def area(self):
         """Returns area of area without areas of isles.

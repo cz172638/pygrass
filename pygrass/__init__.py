@@ -14,3 +14,5 @@ from category import Category
 from history import History
 from raster import RasterRow, RasterSegment, RasterRowIO, RasterNumpy
 from region import Region
+import modules
+import vector
