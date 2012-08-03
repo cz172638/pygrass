@@ -132,3 +132,31 @@ class Ilist(object):
     def contins(self, value):
         """Check if value is in the list"""
         return bool(libvect.Vect_val_in_list(self.c_ilist, value))
+
+class Cats(object):
+    """
+    ['Vect_cidx_get_num_cats_by_index',
+     'Vect_cidx_get_num_unique_cats_by_index',
+     'Vect_copy_table_by_cats',
+     'Vect_destroy_cats_struct',
+     'Vect_reset_cats',
+     'dig_alloc_cats',
+     'line_cats',
+     'struct_line_cats']
+    """
+    def __init__(self, c_mapinfo, area_id):
+        self.c_mapinfo = c_mapinfo
+        self.area_id = area_id
+        self.c_cats =  libvect.Vect_new_cats_struct()
+        self.get_cats()
+
+    def get_cats(self):
+        """Get area categories.
+        int Vect_get_area_cats (const struct Map_info *Map,
+                                int area, struct line_cats *Cats)
+        """
+        libvect.Vect_get_area_cats(self.c_mapinfo, self.area_id, self.c_cats)
+
+    def reset(self):
+        libvect.Vect_reset_cats(self.c_cats)
+

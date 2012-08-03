@@ -11,6 +11,29 @@ from vector_type import VTYPE
 import geometry as geo
 from basic import Bbox
 
+_NUMOF = {"areas":libvect.Vect_get_num_areas,
+          "dblinks":libvect.Vect_get_num_dblinks,
+          "faces":libvect.Vect_get_num_faces,
+          "holes":libvect.Vect_get_num_holes,
+          "islands":libvect.Vect_get_num_islands,
+          "kernels":libvect.Vect_get_num_kernels,
+          "line_points":libvect.Vect_get_num_line_points,
+          "lines":libvect.Vect_get_num_lines,
+          "nodes":libvect.Vect_get_num_nodes,
+          "updated_lines":libvect.Vect_get_num_updated_lines,
+          "updated_nodes":libvect.Vect_get_num_updated_nodes,
+          "volumes":libvect.Vect_get_num_volumes}
+
+_GEOOBJ = {"areas":geo.Area,
+           "dblinks":None,
+           "faces":None,
+           "holes":None,
+           "islands":Isle,
+           "kernels":None,
+           "line_points":None,
+           "lines":Border,
+           "nodes":Node,
+           "volumes":None}
 
 #=============================================
 # VECTOR
@@ -29,43 +52,54 @@ class Vector(object):
         self.overwrite = False
 
 
-    def number_of(self, vtype):
+    def num_primitive_of(self, primitive):
         """
+        primitive are:
+            * "boundary",
+            * "centroid",
+            * "face",
+            * "kernel",
+            * "line",
+            * "point"
+
         >>> rail = Vector('rail')
         >>> rail.open()
-        >>> rail.number_of('line')
+        >>> rail.num_primitive_of('line')
         10831
         >>> municip = Vector('boundary_municp')
         >>> municip.open(topology=True)
-        >>> municip.number_of('line')
+        >>> municip.num_primitive_of('line')
         0
-        >>> municip.number_of('centroid')
+        >>> municip.num_primitive_of('centroid')
         3579
-        >>> municip.number_of('boundary')
+        >>> municip.num_primitive_of('boundary')
         5128
 
         """
         return libvect.Vect_get_num_primitives(self.c_mapinfo,
-                                               VTYPE[vtype])
+                                               VTYPE[primitive])
 
-    def get_line(self, line_id):
-        """Return a Line object given a line number
-
-        >>> rail.get_line(10)
-        Line(id = 10)
-
+    def number_of(self, vtype):
         """
-        return geo.Line(c_mapinfo = self.c_mapinfo, line_id = line_id)
-
-
-    def lines(self):
-        """Return a generator of Line obj
-
-        >>> for line in rail.lines()
-        ...     print line.length()
+        vtype in ["areas", "dblinks", "faces", "holes", "islands", "kernels",
+                  "line_points", "lines", "nodes", "update_lines",
+                  "update_nodes", "volumes"]
         """
-        for line_id in self.number_of('line'):
-            yield self.get_line(line_id)
+        if vtype in _NUMOF.keys():
+            return _NUMOF[vtype](self.c_mapinfo)
+        else:
+            keys = "', '".join(_NUMOF.keys())
+            raise ValueError("vtype not supported, use one of: '%s'" % keys)
+
+    def viter(vtype):
+        if vtype in _GEOOBJ.keys():
+            if _GEOOBJ[vtype] is not None:
+                return (_GEOOBJ[vtype](vid=indx, c_mapinfo=self.c_mapinfo)
+                        for indx in xrange(self.number_of(vtype)))
+        else:
+            keys = "', '".join(_GEOOBJ.keys())
+            raise ValueError("vtype not supported, use one of: '%s'" % keys)
+
 
     def exist():
         pass

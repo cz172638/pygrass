@@ -13,7 +13,7 @@ import grass.lib.vector as libvect
 import numpy as np
 import re
 from collections import Iterable
-from basic import Ilist, Bbox
+from basic import Ilist, Bbox, Cats
 
 WKT = {  # 'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
        'POINT\((.*)\)': 'point',
@@ -268,7 +268,7 @@ class Line(object):
 
     ..
     """
-    def __init__(self, points=None, c_mapinfo=None, lineid=None, field=None,
+    def __init__(self, points=None, c_mapinfo=None, vid=None, field=None,
                  is2D=True):
         self.c_points = libvect.Vect_new_line_struct()
         self.c_mapinfo = c_mapinfo
@@ -738,7 +738,9 @@ class Boundary(object):
     ['Vect_get_area_boundaries',
      'Vect_get_isle_boundaries',]
     """
-    def __init__(self, area_id, c_mapinfo, lines=None, left=None, right=None):
+    def __init__(self, vid=None, area_id=None, c_mapinfo, lines=None,
+                 left=None, right=None):
+        self.bound_id = vid
         self.area_id = area_id
         self.c_mapinfo = c_mapinfo
         self.ilist = Ilist()
@@ -747,7 +749,7 @@ class Boundary(object):
             str_err = "Left and right must have the same length of lines"
             raise ValueError(str_err)
         self.left = Ilist()
-        self.right = right
+        self.right = Ilist()
         # geometry type
         self.gtype = 'boundary'
 
@@ -758,17 +760,106 @@ class Boundary(object):
                                          bounds.c_ilist)
         return bounds
 
+    def get_left_right(self):
+        """""""
+        left = ctypes.poiter(ctypes.c_int())
+        right = ctypes.poiter(ctypes.c_int())
+        libvect.Vect_get_line_areas(self.c_mapinfo, self.bound_id, &left, &right)
+        return left.contents.value, right.contents.value
+
 
 class Centroid(Point):
     """
     ['Vect_attach_centroids',
      'Vect_find_poly_centroid',
-     'Vect_get_area_centroid',
-     'Vect_get_centroid_area']
+]
+
+     ['P_node',
+     'Vect_clean_small_angles_at_nodes',
+     'Vect_find_node',
+     'Vect_get_line_nodes',
+     'Vect_get_node_coor',
+     'Vect_get_node_line',
+     'Vect_get_node_line_angle',
+     'Vect_get_node_n_lines',
+     'Vect_get_num_nodes',
+     'Vect_get_num_updated_nodes',
+     'Vect_get_updated_node',
+     'Vect_graph_set_node_costs',
+     'Vect_net_get_node_cost',
+     'Vect_net_nearest_nodes',
+     'Vect_node_alive',
+     'Vect_select_nodes_by_box',
+     'dig_Rd_P_node',
+     'dig_Wr_P_node',
+     'dig_add_node',
+     'dig_alloc_node',
+     'dig_alloc_nodes',
+     'dig_find_node',
+     'dig_free_node',
+     'dig_free_plus_nodes',
+     'dig_node_add_line',
+     'dig_node_add_updated',
+     'dig_node_alloc_line',
+     'dig_node_angle_check',
+     'dig_node_line_angle',
+     'dig_node_reset_updated',
+     'dig_select_nodes',
+     'dig_spidx_add_node',
+     'dig_spidx_del_node',
+     'dig_spidx_free_nodes',
+     'dig_which_node',
+     'dig_write_nodes',
+     'struct_P_node']
     """
-    def __init__(self):
+    def __init__(self, vid=None, c_mapinfo=None, area_id=None, topology=False):
+        self.c_mapinfo = c_mapinfo
+        self.c_points = libvect.Vect_new_line_struct()
+        self.cats = Cats(c_mapinfo=self.c_mapinfo)
+        if vid and self.c_mapinfo:
+            self.centroid_id = vid
+            self.area_id = self.get_area_id()
+        elif self.c_mapinfo and area_id:
+            self.area_id = area_id
+            self.centroid_id = self.get_centroid_id()
+        else:
+            str_err = "c_mapinfo and one between vid and area_id are required."
+            raise ValueError(str_err)
+        self.read()
+
         # geometry type
         self.gtype = 'centroid'
+        #self.c_pline = ctypes.pointer(libvect.P_line()) if topology else None
+
+    def get_centroid_id(self):
+        centroid_id = libvect.Vect_get_area_centroid(self.c_mapinfo,
+                                                     self.area_id)
+        return centroid_id if centroid_id != 0 else None
+
+    def get_area_id(self):
+        area_id = libvect.Vect_get_centroid_area(self.c_mapinfo,
+                                                 self.centroid_id)
+        return area_id if area_id != 0 else None
+
+    def read(self):
+        """Vect_read_line(Map, Points, Cats, centroid)"""
+        libvect.Vect_read_line(self.c_mapinfo, self.c_points,
+                               self.cats.c_cats, self.centroid_id)
+        self.x = self.c_points.contents.x[0]
+        self.y = self.c_points.contents.y[0]
+        self.z = self.c_points.contents.z[0]
+
+    def write(self):
+        """"""
+        self.c_points.contents.x[0] = self.x
+        self.c_points.contents.y[0] = self.y
+        self.c_points.contents.z[0] = self.z
+        libvect.Vect_write_line(self.c_mapinfo, libvect.GV_CENTROID,
+                                self.c_points, self.cats.c_cats)
+
+
+
+
 
 
 class Isle(object):
@@ -789,8 +880,8 @@ class Isle(object):
      'Vect_point_in_island',
      'Vect_select_isles_by_box']
     """
-    def __init__(self, isle_id, c_mapinfo):
-        self.isle_id = isle_id
+    def __init__(self, vid, c_mapinfo):
+        self.isle_id = vid
         self.c_mapinfo = c_mapinfo
         #self.area_id = area_id
 
@@ -861,6 +952,10 @@ class Isles(object):
         return [Isle(isle_id, self.c_mapinfo, self.area_id)
                 for isle_id in self._isles_id]
 
+    def select_by_bbox(self, bbox):
+        """Vect_select_isles_by_box"""
+        pass
+
 
 
 class Area(object):
@@ -885,13 +980,13 @@ class Area(object):
      'Vect_select_areas_by_polygon']
     """
 
-    def __init__(self, area_id=None, c_mapinfo=None,
+    def __init__(self, vid=None, c_mapinfo=None,
                  boundary=None, centroid=None, isles=[]):
         self.area_id = area_id
         self.c_mapinfo = c_mapinfo
         self.boundary = self.get_boundary()
         self.centroid = centroid
-        self.isles = Ilist()
+        self.isles = self.get_isles()
         # geometry type
         self.gtype = 'area'
 
@@ -906,7 +1001,7 @@ class Area(object):
         self.get_isles()
         pass
 
-    def boundary(self):
+    def points(self):
         """Return a Line object with the outer ring"""
         line = Line()
         libvect.Vect_get_area_points(self.c_mapinfo, self.area_id,
@@ -916,7 +1011,8 @@ class Area(object):
     def centroid(self):
         centroid_id = libvect.Vect_get_area_centroid(self.c_mapinfo,
                                                      self.area_id)
-        return Centroid(self.c_mapinfo, centroid)
+        return Centroid(vid=centroid_id, c_mapinfo=self.c_mapinfo,
+                        area_id=self.area_id)
 
     def num_isles(self):
         return libvect.Vect_get_area_num_isles(self.c_mapinfo, self.area_id)
@@ -925,41 +1021,26 @@ class Area(object):
     def get_isles(self):
         """Instantiate the boundary attribute reading area_id"""
         return Isles(self.c_mapinfo, self.area_id)
-#        num_isles = libvect.Vect_get_area_num_isles(self.c_mapinfo,
-#                                                    self.area_id,)
-#        isles = [libvect.Vect_get_area_isle(self.c_mapinfo, i)
-#                 for i in range(num_isles)]
-#
-#        libvect.Vect_get_isle_boundaries(self.c_mapinfo, isle_id,
-#                                         self.boundary.c_ilist)
 
     def area(self):
         """Returns area of area without areas of isles.
         double Vect_get_area_area (const struct Map_info *Map, int area)
 
         """
-        pass
+        return libvect.Vect_get_area_area(self.mapinfo, self.area_id)
 
     def alive(self):
-        """Check if area is alive or dead (level 2 required)
-
-        Parameters :
-        Map	pointer to Map_info structure
-        area	area id
-
-        Returns:
-        1 area alive
-        0 area is dead
-
-        int Vect_area_alive(const struct Map_info *Map, int area)
+        """Check if area is alive or dead (topology required)
         """
-        pass
+        return bool(libvect.Vect_area_alive(self.mapinfo, self.area_id))
 
     def bbox(self):
         """
         Vect_get_area_box
         """
-        pass
+        bbox = Bbox()
+        libvect.Vect_get_area_box(self.mapinfo, self.area_id, bbox.c_bbox)
+        return bbox
 
     def buffer(self):
         """Creates buffer around area.
@@ -997,13 +1078,18 @@ class Area(object):
         int Vect_get_area_boundaries(const struct Map_info *Map,
                                      int area, struct ilist *List)
         """
+        ilist = Ilist()
+        libvect.Vect_get_area_boundaries(self.c_mapinfo, self.area_id,
+                                         ilist.c_ilist)
+        return ilist
 
     def cats(self):
         """Get area categories.
         int Vect_get_area_cats (const struct Map_info *Map,
                                 int area, struct line_cats *Cats)
         """
-        pass
+        return Cats(self.c_mapinfo, self.area_id)
+
 
     def get_first_cat(self):
         """Find FIRST category of given field and area.
@@ -1012,20 +1098,17 @@ class Area(object):
         """
         pass
 
-    def contain_pnt(self):
+    def contain_pnt(self, pnt):
         """Check if point is in area.
         int Vect_point_in_area(double x, double y,
                                const struct Map_info *Map,
                                int area, struct bound_box box)
         """
-        pass
+        bbox = self.bbox()
+        libvect.Vect_point_in_area(pnt.x, pnt.y, self.c_mapinfo, self.area_id,
+                                   bbox.c_bbox)
+        return bbox
 
-    def centroid(self):
-        """Returns centroid id for given area.
-
-        int Vect_get_area_centroid(const struct Map_info *Map, int area)
-        """
-        pass
 
     def perimeter(self):
         """Calculate area perimeter.
@@ -1033,45 +1116,5 @@ class Area(object):
         double Vect_area_perimeter (const struct line_pnts *Points)
 
         """
-
-    def points(self):
-        """Returns polygon array of points (outer ring) of given area.
-        int 	Vect_get_area_points (const struct Map_info *Map,
-                                   int area, struct line_pnts *BPoints)
-        """
-        pass
-
-    def isles_boundary(self):
-        """Creates list of boundaries for given isle.
-
-        int Vect_get_isle_boundaries (const struct Map_info *Map,
-                                      int isle, struct ilist *List)
-        """
-
-    def isles_points(self):
-        """Returns polygon array of points for given isle.
-        int 	Vect_get_isle_points(const struct Map_info *Map,
-                                    int isle, struct line_pnts *BPoints)
-        """
-        pass
-
-    def num_isles(self):
-        """Returns number of isles for given area.
-
-        int Vect_get_area_num_isles (const struct Map_info *Map, int area)
-        """
-        pass
-
-    def isle_id(self):
-        """Returns isle id for area.
-
-        int Vect_get_area_isle (const struct Map_info *Map, int area, int isle)
-        """
-        pass
-
-    def id_area(self):
-        """Returns area id for isle.
-
-        int 	Vect_get_isle_area (const struct Map_info *Map, int isle)
-        """
-        pass
+        border = self.points()
+        return libvect.Vect_area_perimeter(border.c_points)
