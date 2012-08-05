@@ -218,7 +218,7 @@ class RasterAbstractBase(object):
 
         call the C function `G_find_raster`."""
         if self.name:
-            self.mapset = env.get_mapset(self.name, self.mapset)
+            self.mapset = env.get_mapset_raster(self.name, self.mapset)
         else:
             return False
         if self.mapset:

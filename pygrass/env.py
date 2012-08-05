@@ -33,8 +33,11 @@ def copy(existingmap, newmap, maptype):
                           **{maptype : '{old},{new}'.format(old = existingmap,
                                                             new = newmap),})
 
-def get_mapset(mapname, mapset = ''):
+def get_mapset_raster(mapname, mapset = ''):
     return libgis.G_find_raster(mapname, '')
+
+def get_mapset_vector(mapname, mapset = ''):
+    return libgis.G_find_vector(mapname, '')
 
 def exist(mapname, mapset = ''):
     mapset = get_mapset(mapname, mapset)

@@ -11,8 +11,21 @@ from collections import Iterable
 
 
 class Bbox(object):
-    def __init__(self):
+    def __init__(self, north=None, south=None, east=None, west=None,
+                 top=None, bottom=None):
         self.c_bbox = ctypes.pointer(libvect.bound_box())
+        if north:
+            self.north = north
+        if south:
+            self.south = south
+        if east:
+            self.east = east
+        if west:
+            self.west = west
+        if top:
+            self.top = top
+        if bottom:
+            self.bottom = bottom
 
     def _get_n(self):
         return self.c_bbox.contents.N
@@ -61,6 +74,10 @@ class Bbox(object):
         self.c_bbox.contents.B = value
 
     bottom = property(fget=_get_b, fset=_set_b)
+
+    def __repr__(self):
+        return "Bbox({n}, {s}, {e}, {w})".format(n=self.north, s=self.south,
+                                                 e=self.east, w=self.west)
 
 
 
@@ -155,6 +172,7 @@ class Cats(object):
         int Vect_get_area_cats (const struct Map_info *Map,
                                 int area, struct line_cats *Cats)
         """
+        #import pdb; pdb.set_trace()
         libvect.Vect_get_area_cats(self.c_mapinfo, self.area_id, self.c_cats)
 
     def reset(self):
