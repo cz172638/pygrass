@@ -9,23 +9,41 @@ import grass.lib.vector as libvect
 from collections import Iterable
 
 
-
 class Bbox(object):
-    def __init__(self, north=None, south=None, east=None, west=None,
-                 top=None, bottom=None):
+    """Instantiate a Bounding Box class that contain
+    a ctypes pointer to the C struct bound_box, that could be use
+    by C GRASS functions. ::
+
+        >>> bbox = Bbox()
+        >>> bbox
+        Bbox(0.0, 0.0, 0.0, 0.0)
+
+    The default parameters are 0. It is possible to set or change
+    the parameters later, with: ::
+
+        >>> bbox.north = 10
+        >>> bbox.south = -10
+        >>> bbox.east = -20
+        >>> bbox.west = 20
+        >>> bbox
+        Bbox(10.0, -10.0, -20.0, 20.0)
+
+    Or directly istantiate the class with the values, with: ::
+
+        >>> bbox = Bbox(north=100, south=0, east=0, west=100)
+        >>> bbox
+        Bbox(100.0, 0.0, 0.0, 100.0)
+
+    ..
+    """
+    def __init__(self, north=0, south=0, east=0, west=0, top=0, bottom=0):
         self.c_bbox = ctypes.pointer(libvect.bound_box())
-        if north:
-            self.north = north
-        if south:
-            self.south = south
-        if east:
-            self.east = east
-        if west:
-            self.west = west
-        if top:
-            self.top = top
-        if bottom:
-            self.bottom = bottom
+        self.north = north
+        self.south = south
+        self.east = east
+        self.west = west
+        self.top = top
+        self.bottom = bottom
 
     def _get_n(self):
         return self.c_bbox.contents.N
@@ -80,8 +98,9 @@ class Bbox(object):
                                                  e=self.east, w=self.west)
 
 
-
 class Ilist(object):
+    """Instantiate a list of integer using the C GRASS struct ``ilist``,
+    the class contains this struct as ``c_ilist`` attribute. """
     def __init__(self, integer_list=None):
         self.c_ilist = libvect.Vect_new_list()
         if integer_list is not None:
@@ -126,7 +145,7 @@ class Ilist(object):
         libvect.Vect_reset_list(self.c_ilist)
 
     def extend(self, ilist):
-        """Extend the list with anothe Ilist object or
+        """Extend the list with another Ilist object or
         with a list of integers"""
         if isinstance(ilist, Ilist):
             libvect.Vect_list_append_list(self.c_ilist, ilist.ilist)
@@ -150,31 +169,25 @@ class Ilist(object):
         """Check if value is in the list"""
         return bool(libvect.Vect_val_in_list(self.c_ilist, value))
 
+
 class Cats(object):
+    """Instantiate a Category class that contain a ctypes pointer
+    to the Map_info C struct, and a ctypes pointer to tha C cats struct,
+    that could be use by C functions.
     """
-    ['Vect_cidx_get_num_cats_by_index',
-     'Vect_cidx_get_num_unique_cats_by_index',
-     'Vect_copy_table_by_cats',
-     'Vect_destroy_cats_struct',
-     'Vect_reset_cats',
-     'dig_alloc_cats',
-     'line_cats',
-     'struct_line_cats']
-    """
+
     def __init__(self, c_mapinfo, area_id):
         self.c_mapinfo = c_mapinfo
         self.area_id = area_id
-        self.c_cats =  libvect.Vect_new_cats_struct()
+        self.c_cats = libvect.Vect_new_cats_struct()
         self.get_cats()
 
     def get_cats(self):
-        """Get area categories.
-        int Vect_get_area_cats (const struct Map_info *Map,
-                                int area, struct line_cats *Cats)
+        """Get area categories, set the c_cats struct given an area, using the
+        ``Vect_get_area_cats`` function.
         """
-        #import pdb; pdb.set_trace()
         libvect.Vect_get_area_cats(self.c_mapinfo, self.area_id, self.c_cats)
 
     def reset(self):
+        """Reset the C cats struct from previous values."""
         libvect.Vect_reset_cats(self.c_cats)
-
