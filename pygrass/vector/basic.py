@@ -98,6 +98,119 @@ class Bbox(object):
                                                  e=self.east, w=self.west)
 
 
+class BoxList(object):
+    def __init__(self, boxlist=None):
+        self.c_boxlist = libvect.Vect_new_boxlist(1)
+        if boxlist is not None:
+            for box in boxlist:
+                self.append(box)
+
+    def __len__(self):
+        return self.c_boxlist.contents.n_values
+
+    def __repr__(self):
+        return "Boxlist([%s])" % ", ".join([repr(box)
+                                            for box in self.__iter__()])
+
+    def __getitem__(self, indx):
+        bbox = Bbox()
+        bbox.c_bbox = ctypes.pointer(self.c_boxlist.contents.box[indx])
+        return bbox
+
+    def __setitem__(self, indx, bbox):
+        self.c_boxlist.cotents.box[indx] = bbox
+
+    def __iter__(self):
+        return (self.__getitem__(box_id) for box_id in xrange(self.__len__()))
+
+    def __str__(self):
+        return self.__repr__()
+
+    def append(self, box):
+        """Append a Bbox object to a Boxlist object, using the
+        ``Vect_boxlist_append`` C fuction. ::
+
+            >>> box0 = Bbox()
+            >>> box1 = Bbox(1,2,3,4)
+            >>> box2 = Bbox(5,6,7,8)
+            >>> boxlist = BoxList([box0, box1])
+            >>> boxlist
+            Boxlist([Bbox(0.0, 0.0, 0.0, 0.0), Bbox(1.0, 2.0, 3.0, 4.0)])
+            >>> len(boxlist)
+            2
+            >>> boxlist.append(box2)
+            >>> len(boxlist)
+            3
+        ..
+        """
+        indx = self.__len__()
+        libvect.Vect_boxlist_append(self.c_boxlist, indx, box.c_bbox.contents)
+
+    def extend(self, boxlist):
+        """Extend a boxlist with another boxlist or using a list of Bbox, using
+        ``Vect_boxlist_append_boxlist`` c function. ::
+
+            >>> box0 = Bbox()
+            >>> box1 = Bbox(1,2,3,4)
+            >>> box2 = Bbox(5,6,7,8)
+            >>> box3 = Bbox(9,8,7,6)
+            >>> boxlist0 = BoxList([box0, box1])
+            >>> boxlist1 = BoxList([box2, box3])
+            >>> len(boxlist0)
+            2
+            >>> boxlist0.extend(boxlist1)
+            >>> len(boxlist0)
+            4
+            >>> boxlist1.extend([box0, box1])
+            >>> len(boxlist1)
+            4
+        """
+        if hasattr(boxlist, 'c_boxlist'):
+            libvect.Vect_boxlist_append_boxlist(self.c_boxlist,
+                                                boxlist.c_boxlist)
+        else:
+            for box in boxlist:
+                self.append(box)
+
+    def remove(self, indx):
+        """Remove Bbox from the boxlist, given an integer or a list of integer
+        or a boxlist, using ``Vect_boxlist_delete`` C function or the
+        ``Vect_boxlist_delete_boxlist``. ::
+
+            >>> boxlist = BoxList([Bbox(),
+            ...                    Bbox(1, 0, 0, 1),
+            ...                    Bbox(1, -1, -1, 1)])
+            >>> boxlist.remove(0)
+            >>> boxlist
+
+        ..
+        """
+        if hasattr(indx, 'c_boxlist'):
+            libvect.Vect_boxlist_delete_boxlist(self.c_boxlist, indx.c_boxlist)
+        elif isinstance(indx, int):
+            libvect.Vect_boxlist_delete(self.c_boxlist, indx)
+        else:
+            for ind in indx:
+                libvect.Vect_boxlist_delete(self.c_boxlist, ind)
+
+    def reset(self):
+        """Reset the c_boxlist C struct, using the ``Vect_reset_boxlist`` C
+        function. ::
+
+            >>> boxlist = BoxList([Bbox(),
+            ...                    Bbox(1, 0, 0, 1),
+            ...                    Bbox(1, -1, -1, 1)])
+            >>> len(boxlist)
+            3
+            >>> boxlist.reset()
+            >>> len(boxlist)
+            0
+
+        ..
+        """
+        libvect.Vect_reset_boxlist(self.c_boxlist)
+
+
 class Ilist(object):
     """Instantiate a list of integer using the C GRASS struct ``ilist``,
     the class contains this struct as ``c_ilist`` attribute. """

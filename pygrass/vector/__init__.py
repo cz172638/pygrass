@@ -9,6 +9,7 @@ import grass.lib.vector as libvect
 from vector_type import VTYPE
 import geometry as geo
 from basic import Bbox
+from table import DBlinks
 
 import sys
 import os
@@ -73,7 +74,13 @@ class Vector(object):
         self._spatial_index = libvect.spatial_index()
         self.topology = False
         self.overwrite = False
+        self.dblinks = None
 
+    def __repr__(self):
+        if self.exist():
+            return "Vector(%r, %r)" % (self.name, self.mapset)
+        else:
+            return "Vector(%r)" % self.name
 
     def num_primitive_of(self, primitive):
         """primitive are:
@@ -108,7 +115,7 @@ class Vector(object):
                   "line_points", "lines", "nodes", "update_lines",
                   "update_nodes", "volumes"]
 
-            >>> municip = v.Vector('boundary_municp')
+            >>> municip = Vector('boundary_municp')
             >>> municip.open(topology=True)
             >>> municip.number_of("areas")
             3579
@@ -121,7 +128,7 @@ class Vector(object):
             >>> municip.number_of("nodes")
             4178
             >>> municip.number_of("pizza")
-            ... # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+            ...                     # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
             Traceback (most recent call last):
                 ...
             ValueError: vtype not supported, use one of:
@@ -134,7 +141,7 @@ class Vector(object):
         if vtype in _NUMOF.keys():
             return _NUMOF[vtype](self.c_mapinfo)
         else:
-            keys = "', '".join(_NUMOF.keys())
+            keys = "', '".join(sorted(_NUMOF.keys()))
             raise ValueError("vtype not supported, use one of: '%s'" % keys)
 
     def viter(self, vtype):
@@ -166,7 +173,7 @@ class Vector(object):
                 return (_GEOOBJ[vtype](vid=indx, c_mapinfo=self.c_mapinfo)
                         for indx in xrange(1, self.number_of(vtype) + 1))
         else:
-            keys = "', '".join(_GEOOBJ.keys())
+            keys = "', '".join(sorted(_GEOOBJ.keys()))
             raise ValueError("vtype not supported, use one of: '%s'" % keys)
 
 
@@ -201,6 +208,7 @@ class Vector(object):
             if libvect.Vect_open_new(self.c_mapinfo,
                                      self.name, libvect.WITHOUT_Z) == -1:
                 raise  # TODO raise error, somwthing went wrong in GRASS
+        self.dblinks = DBlinks(self.c_mapinfo)
 
     def close(self):
         pass

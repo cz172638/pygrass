@@ -14,6 +14,7 @@ Contents:
    raster
    vector
    modules
+   attributes
 
 
 

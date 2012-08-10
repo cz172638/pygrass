@@ -12,11 +12,10 @@ import grass.lib.vector as libvect
 #from vector_type import VTYPE
 import numpy as np
 import re
-from collections import Iterable
 from basic import Ilist, Bbox, Cats
 
-WKT = {  # 'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
-       'POINT\((.*)\)': 'point',
+
+WKT = {'POINT\((.*)\)': 'point',  # 'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
        'LINESTRING\((.*)\)': 'line'}
 
 
@@ -29,7 +28,8 @@ def read_WKT(string):
     POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1, 2 1, 2 2, 1 2,1 1))
     MULTIPOINT(0 0,1 2)
     MULTILINESTRING((0 0,1 1,1 2),(2 3,3 2,5 4))
-    MULTIPOLYGON(((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1)), ((-1 -1,-1 -2,-2 -2,-2 -1,-1 -1)))
+    MULTIPOLYGON(((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1)),
+                 ((-1 -1,-1 -2,-2 -2,-2 -1,-1 -1)))
     GEOMETRYCOLLECTION(POINT(2 3),LINESTRING(2 3,3 4))
 
 
@@ -41,11 +41,17 @@ def read_WKT(string):
     SRID=4326;MULTIPOINTM(0 0 0,1 2 1) -- XYM with SRID
     MULTILINESTRING((0 0 0,1 1 0,1 2 1),(2 3 1,3 2 1,5 4 1))
     POLYGON((0 0 0,4 0 0,4 4 0,0 4 0,0 0 0),(1 1 0,2 1 0,2 2 0,1 2 0,1 1 0))
-    MULTIPOLYGON(((0 0 0,4 0 0,4 4 0,0 4 0,0 0 0),(1 1 0,2 1 0,2 2 0,1 2 0,1 1 0)),((-1 -1 0,-1 -2 0,-2 -2 0,-2 -1 0,-1 -1 0)))
+    MULTIPOLYGON(((0 0 0,4 0 0,4 4 0,0 4 0,0 0 0),
+                  (1 1 0,2 1 0,2 2 0,1 2 0,1 1 0)),
+                 ((-1 -1 0,-1 -2 0,-2 -2 0,-2 -1 0,-1 -1 0)))
     GEOMETRYCOLLECTIONM( POINTM(2 3 9), LINESTRINGM(2 3 4, 3 4 5) )
     MULTICURVE( (0 0, 5 5), CIRCULARSTRING(4 0, 4 4, 8 4) )
-    POLYHEDRALSURFACE( ((0 0 0, 0 0 1, 0 1 1, 0 1 0, 0 0 0)), ((0 0 0, 0 1 0, 1 1 0, 1 0 0, 0 0 0)), ((0 0 0, 1 0 0, 1 0 1, 0 0 1, 0
-    0 0)), ((1 1 0, 1 1 1, 1 0 1, 1 0 0, 1 1 0)), ((0 1 0, 0 1 1, 1 1 1, 1 1 0, 0 1 0)), ((0 0 1, 1 0 1, 1 1 1, 0 1 1, 0 0 1)) )
+    POLYHEDRALSURFACE( ((0 0 0, 0 0 1, 0 1 1, 0 1 0, 0 0 0)),
+                       ((0 0 0, 0 1 0, 1 1 0, 1 0 0, 0 0 0)),
+                       ((0 0 0, 1 0 0, 1 0 1, 0 0 1, 0 0 0)),
+                       ((1 1 0, 1 1 1, 1 0 1, 1 0 0, 1 1 0)),
+                       ((0 1 0, 0 1 1, 1 1 1, 1 1 0, 0 1 0)),
+                       ((0 0 1, 1 0 1, 1 1 1, 0 1 1, 0 0 1)) )
     TRIANGLE ((0 0, 0 9, 9 0, 0 0))
     TIN( ((0 0 0, 0 0 1, 0 1 0, 0 0 0)), ((0 0 0, 0 1 0, 1 1 0, 0 0 0)) )
 
@@ -80,6 +86,8 @@ def get_xyz(pnt):
         Traceback (most recent call last):
             ...
         ValueError: The the format of the point is not supported: (1, 1, 2, 2)
+
+    ..
     """
     if isinstance(pnt, Point):
         if pnt.is2D:
@@ -100,11 +108,12 @@ def get_xyz(pnt):
 
 
 class Point(object):
-    """
+    """Instantiate a Point object that could be 2 or 3D, default
+    parameters are 0.
 
     ::
 
-        >>> pnt = Point(0, 0)
+        >>> pnt = Point()
         >>> pnt.x
         0.0
         >>> pnt.y
@@ -112,8 +121,8 @@ class Point(object):
         >>> pnt.z
         >>> pnt.is2D
         True
-        >>> pnt.coords()
-        (0.0, 0.0)
+        >>> pnt
+        Point(0.000000, 0.000000)
         >>> pnt.z = 0
         >>> pnt.is2D
         False
@@ -121,15 +130,17 @@ class Point(object):
         Point(0.000000, 0.000000, 0.000000)
         >>> print pnt
         POINT(0.000000, 0.000000, 0.000000)
+
+    ..
     """
-    def __init__(self, x=None, y=None, z=None, is2D=True):
+    def __init__(self, x=0, y=0, z=0, is2D=True):
         self.c_px = ctypes.pointer(ctypes.c_double())
         self.c_py = ctypes.pointer(ctypes.c_double())
         self.c_pz = ctypes.pointer(ctypes.c_double())
         self.is2D = is2D
 
-        self.x = x if x else 0
-        self.y = y if y else 0
+        self.x = x
+        self.y = y
         self.z = z
 
         # geometry type
@@ -179,14 +190,21 @@ class Point(object):
         return Point(*pnt).coords() == self.coords()
 
     def coords(self):
-        """Return a tuple with the point coordinates.
-        ::
+        """Return a tuple with the point coordinates. ::
 
-            >>> pnt = Point(0, 0)
+            >>> pnt = Point(10, 100)
             >>> pnt.coords()
-            (0.0, 0.0)
+            (10.0, 100.0)
 
-        If the point is 2D return a x, y tuple.
+        If the point is 2D return a x, y tuple. But if we change the ``z``
+        the Point object become a 3D point, therefore the method return a
+        x, y, z tuple. ::
+
+            >>> pnt.z = 1000.
+            >>> pnt.coords()
+            (10.0, 100.0, 1000.0)
+
+        ..
         """
         if self.is2D:
             return self.x, self.y
@@ -196,9 +214,9 @@ class Point(object):
     def get_wkt(self):
         """Return a "well know text" (WKT) geometry string. ::
 
-            >>> pnt = Point(0, 0)
+            >>> pnt = Point(10, 100)
             >>> pnt.get_wkt()
-            'POINT(0.000000, 0.000000)'
+            'POINT(10.000000, 100.000000)'
 
         .. warning::
 
@@ -209,7 +227,13 @@ class Point(object):
                                         for coord in self.coords()])
 
     def get_wkb(self):
-        """Return a "well know binary" (WKB) geometry buffer"""
+        """Return a "well know binary" (WKB) geometry buffer
+
+        .. warning::
+
+            Not implemented yet.
+
+        """
         pass
 
     def distance(self, pnt):
@@ -291,6 +315,8 @@ class Line(object):
             Point(3.000000, 3.000000)
             >>> line[:2]
             [Point(0.000000, 0.000000), Point(1.000000, 1.000000)]
+
+        ..
         """
         #TODO:
         # line[0].x = 10 is not working
@@ -322,6 +348,8 @@ class Line(object):
             >>> line[0] = (2, 2)
             >>> line
             Line([Point(2.000000, 2.000000), Point(1.000000, 1.000000)])
+
+        ..
         """
         x, y, z = get_xyz(pnt)
         self.c_points.contents.x[indx] = x
@@ -333,10 +361,7 @@ class Line(object):
         return (self.__getitem__(i) for i in range(self.__len__()))
 
     def __len__(self):
-        """Return the number of points
-
-        int 	Vect_get_num_line_points (const struct line_pnts *Points)
-        Get number of line points."""
+        """Return the number of points of the line."""
         return self.c_points.contents.n_points
 
     def __str__(self):
@@ -345,25 +370,21 @@ class Line(object):
     def __repr__(self):
         return "Line([%s])" % ', '.join([repr(pnt) for pnt in self.__iter__()])
 
-#    def __del__(self):
-# """Frees all memory associated with a line_pnts structure, including the
-# structure itself.
-#        void 	Vect_destroy_line_struct (struct line_pnts *p)
-#        """
-#        libvect.Vect_destroy_line_struct(ctypes.byref(self.c_points))
-
     def get_pnt(self, distance, angle=0, slope=0):
         """Return a Point object on line in the specified distance, using the
         `Vect_point_on_line` C function.
         Raise a ValueError If the distance exceed the Line length. ::
 
             >>> line = Line([(0, 0), (1, 1)])
-            >>> line.get_pnt(5)                           #doctest: +ELLIPSIS
+            >>> line.get_pnt(5)      #doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
             Traceback (most recent call last):
                 ...
-            ValueError: The distance exceed the lenght of the line, that is: 1.414214
+            ValueError: The distance exceed the lenght of the line,
+            that is: 1.414214
             >>> line.get_pnt(1)
             Point(0.707107, 0.707107)
+
+        ..
         """
         # instantiate an empty Point object
         maxdist = self.length()
@@ -400,21 +421,10 @@ class Line(object):
 
             >>> line = Line([(0, 0), (0, 1), (2, 1), (2, 0)])
             >>> bbox = line.bbox()
-            >>> bbox.north
-            1.0
-            >>> bbox.south
-            0.0
-            >>> bbox.east
-            2.0
-            >>> bbox.west
-            0.0
-            >>> bbox.top
-            0.0
-            >>> bbox.bottom
-            0.0
+            >>> bbox
+            Bbox(1.0, 0.0, 2.0, 0.0)
 
-        It is possible to access to the C struct of the object with:
-        ``bbox.c_bbox``
+        ..
         """
         bbox = Bbox()
         libvect.Vect_line_box(self.c_points, bbox.c_bbox)
@@ -535,7 +545,12 @@ class Line(object):
     def get_first_cat(self):
         """Fetches FIRST category number for given vector line and field, using
         the ``Vect_get_line_cat`` C function.
+
+        .. warning::
+
+            Not implemented yet.
         """
+        # TODO: add this method.
         libvect.Vect_get_line_cat(self.map, self.lineid, self.field)
         pass
 
@@ -662,8 +677,8 @@ class Line(object):
         """Return a Well Known Text string of the line. ::
 
             >>> line = Line([(0, 0), (1, 1), (1, 2)])
-            >>> line.get_wkt()
-            'LINESTRING(0.000000 0.000000, 1.000000 1.000000, 1.000000 2.000000)'
+            >>> line.get_wkt()                 #doctest: +ELLIPSIS
+            'LINESTRING(0.000000 0.000000, ..., 1.000000 2.000000)'
 
         ..
         """
@@ -692,6 +707,12 @@ class Line(object):
             return None
 
     def get_wkb(self):
+        """Return a WKB buffer.
+
+        .. warning::
+
+            Not implemented yet.
+        """
         pass
 
     def buffer(self, dist=None, dist_x=None, dist_y=None,
@@ -700,6 +721,7 @@ class Line(object):
         ``Vect_line_buffer2`` C function.
 
         .. warning::
+
             Not implemented yet.
         """
         if dist is not None:
@@ -730,13 +752,13 @@ class Line(object):
         """
         libvect.Vect_reset_line(self.c_points)
 
+
 class Node(object):
     pass
 
+
 class Boundary(object):
     """
-    ['Vect_get_area_boundaries',
-     'Vect_get_isle_boundaries',]
     """
     def __init__(self, vid=None, area_id=None, c_mapinfo=None, lines=None,
                  left=None, right=None):
@@ -771,51 +793,12 @@ class Boundary(object):
 
 
 class Centroid(Point):
-    """
-    ['Vect_attach_centroids',
-     'Vect_find_poly_centroid',
-]
-
-     ['P_node',
-     'Vect_clean_small_angles_at_nodes',
-     'Vect_find_node',
-     'Vect_get_line_nodes',
-     'Vect_get_node_coor',
-     'Vect_get_node_line',
-     'Vect_get_node_line_angle',
-     'Vect_get_node_n_lines',
-     'Vect_get_num_nodes',
-     'Vect_get_num_updated_nodes',
-     'Vect_get_updated_node',
-     'Vect_graph_set_node_costs',
-     'Vect_net_get_node_cost',
-     'Vect_net_nearest_nodes',
-     'Vect_node_alive',
-     'Vect_select_nodes_by_box',
-     'dig_Rd_P_node',
-     'dig_Wr_P_node',
-     'dig_add_node',
-     'dig_alloc_node',
-     'dig_alloc_nodes',
-     'dig_find_node',
-     'dig_free_node',
-     'dig_free_plus_nodes',
-     'dig_node_add_line',
-     'dig_node_add_updated',
-     'dig_node_alloc_line',
-     'dig_node_angle_check',
-     'dig_node_line_angle',
-     'dig_node_reset_updated',
-     'dig_select_nodes',
-     'dig_spidx_add_node',
-     'dig_spidx_del_node',
-     'dig_spidx_free_nodes',
-     'dig_which_node',
-     'dig_write_nodes',
-     'struct_P_node']
-    """
-    def __init__(self, vid=None, c_mapinfo=None, area_id=None, topology=False):
-        super(Centroid, self).__init__()
+    """The Centroid class inherit from the Point class.
+    Centroid contains an attribute with the C Map_info struct, and attributes
+    with the id of the Area."""
+    def __init__(self, vid=None, c_mapinfo=None, area_id=None, topology=False,
+                 x=0, y=0, z=0, is2D=True):
+        super(Centroid, self).__init__(x, y, z, is2D)
         self.c_mapinfo = c_mapinfo
         self.c_points = libvect.Vect_new_line_struct()
         if vid and self.c_mapinfo:
@@ -840,17 +823,24 @@ class Centroid(Point):
         return "Centoid(%d)" % self.centroid_id
 
     def get_centroid_id(self):
+        """Return the centroid_id, using the c_mapinfo and an area_id
+        attributes of the class, and calling the Vect_get_area_centroid
+        C function, if no centroid_id were found return None"""
         centroid_id = libvect.Vect_get_area_centroid(self.c_mapinfo,
                                                      self.area_id)
         return centroid_id if centroid_id != 0 else None
 
     def get_area_id(self):
+        """Return the area_id, using the c_mapinfo and an centroid_id
+        attributes of the class, and calling the Vect_get_centroid_area
+        C function, if no area_id were found return None"""
         area_id = libvect.Vect_get_centroid_area(self.c_mapinfo,
                                                  self.centroid_id)
         return area_id if area_id != 0 else None
 
     def read(self):
-        """Vect_read_line(Map, Points, Cats, centroid)"""
+        """Read and set the coordinates of the centroid from the vector map,
+        using the centroid_id and calling the Vect_read_line C function"""
         libvect.Vect_read_line(self.c_mapinfo, self.c_points,
                                self.cats.c_cats, self.centroid_id)
         self.x = self.c_points.contents.x[0]
@@ -858,7 +848,7 @@ class Centroid(Point):
         self.z = self.c_points.contents.z[0]
 
     def write(self):
-        """"""
+        """Write the centroid to the Map."""
         self.c_points.contents.x[0] = self.x
         self.c_points.contents.y[0] = self.y
         self.c_points.contents.z[0] = self.z
@@ -866,27 +856,8 @@ class Centroid(Point):
                                 self.c_points, self.cats.c_cats)
 
 
-
-
-
-
 class Isle(object):
-    """
-    ['Vect_attach_isle',
-     'Vect_attach_isles',
-     'Vect_find_island',
-     'Vect_get_area_isle',
-     'Vect_get_area_num_isles',
-     'Vect_get_isle_area',
-     'Vect_get_isle_boundaries',
-     'Vect_get_isle_box',
-     'Vect_get_isle_points',
-     'Vect_get_isle_points_geos',
-     'Vect_get_num_islands',
-     'Vect_get_point_in_poly_isl',
-     'Vect_isle_alive',
-     'Vect_point_in_island',
-     'Vect_select_isles_by_box']
+    """An Isle is an area contained by another area.
     """
     def __init__(self, vid, c_mapinfo):
         self.isle_id = vid
@@ -939,9 +910,8 @@ class Isle(object):
         """Return the area value of an Isle"""
         border = self.points()
         return libgis.G_area_of_polygon(border.c_points.contents.x,
-                                 border.c_points.contents.y,
-                                 border.c_points.contents.n_points)
-
+                                        border.c_points.contents.y,
+                                        border.c_points.contents.n_points)
 
     def perimeter(self):
         """Return the perimeter value of an Isle
@@ -959,7 +929,6 @@ class Isles(object):
         self.area_id = area_id
         self._isles_id = self.get_isles_id()
         self._isles = self.get_isles()
-
 
     def __len__(self):
         return libvect.Vect_get_area_num_isles(self.c_mapinfo, self.area_id)
@@ -981,7 +950,6 @@ class Isles(object):
     def select_by_bbox(self, bbox):
         """Vect_select_isles_by_box"""
         pass
-
 
 
 class Area(object):
@@ -1045,7 +1013,6 @@ class Area(object):
 
     def num_isles(self):
         return libvect.Vect_get_area_num_isles(self.c_mapinfo, self.area_id)
-
 
     def get_isles(self):
         """Instantiate the boundary attribute reading area_id"""
@@ -1119,7 +1086,6 @@ class Area(object):
         """
         return Cats(self.c_mapinfo, self.area_id)
 
-
     def get_first_cat(self):
         """Find FIRST category of given field and area.
 
@@ -1137,7 +1103,6 @@ class Area(object):
         libvect.Vect_point_in_area(pnt.x, pnt.y, self.c_mapinfo, self.area_id,
                                    bbox.c_bbox)
         return bbox
-
 
     def perimeter(self):
         """Calculate area perimeter.
