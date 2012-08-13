@@ -6,7 +6,7 @@ Created on Tue Jul 17 08:51:53 2012
 """
 import ctypes
 import grass.lib.vector as libvect
-from vector_type import VTYPE
+from vector_type import VTYPE, GV_TYPE
 import geometry as geo
 from basic import Bbox
 from table import DBlinks
@@ -18,6 +18,14 @@ vectorpath = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(vectorpath)
 sys.path.append("%s/.." % vectorpath)
 import env
+
+class OpenError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
 
 _NUMOF = {"areas": libvect.Vect_get_num_areas,
           "dblinks": libvect.Vect_get_num_dblinks,
@@ -42,6 +50,12 @@ _GEOOBJ = {"areas": geo.Area,
            "lines": geo.Boundary,
            "nodes": geo.Node,
            "volumes": None}
+
+                 # 0    1         2       3           4           5
+feature_label = [None, 'point', 'line', 'boundary', 'centroid', 'face',
+                 # 6        7        8
+                 'kernel', 'area', 'volume']
+
 
 #=============================================
 # VECTOR
@@ -94,7 +108,7 @@ class Vector(object):
             >>> rail = Vector('rail')
             >>> rail.open()
             >>> rail.num_primitive_of('line')
-            10831
+            10837
             >>> municip = Vector('boundary_municp')
             >>> municip.open(topology=True)
             >>> municip.num_primitive_of('line')
@@ -132,9 +146,10 @@ class Vector(object):
             Traceback (most recent call last):
                 ...
             ValueError: vtype not supported, use one of:
-            'updated_nodes', 'lines', 'dblinks', 'areas', 'kernels',
-            'holes', 'updated_lines', 'volumes', 'faces', 'islands',
-            'nodes', 'line_points'
+            'areas', 'dblinks', 'faces', 'holes', 'islands', 'kernels',
+            'line_points', 'lines', 'nodes', 'updated_lines', 'updated_nodes',
+            'volumes'
+
 
         ..
         """
@@ -148,7 +163,7 @@ class Vector(object):
         """Return an iterator of vector features
 
         ::
-            >>> municip = v.Vector('boundary_municp')
+            >>> municip = Vector('boundary_municp')
             >>> municip.open(topology=True)
             >>> big = [area for area in municip.viter('areas')
             ...        if area.alive() and area.area >= 10000]
@@ -170,12 +185,56 @@ class Vector(object):
         """
         if vtype in _GEOOBJ.keys():
             if _GEOOBJ[vtype] is not None:
-                return (_GEOOBJ[vtype](vid=indx, c_mapinfo=self.c_mapinfo)
+                return (_GEOOBJ[vtype](v_id=indx, c_mapinfo=self.c_mapinfo)
                         for indx in xrange(1, self.number_of(vtype) + 1))
         else:
             keys = "', '".join(sorted(_GEOOBJ.keys()))
             raise ValueError("vtype not supported, use one of: '%s'" % keys)
 
+    def num_of_features(self):
+        return libvect.Vect_get_num_lines(self.c_mapinfo)
+
+    def feature_iter(self):
+        pass #  Vect_get_num_lines
+
+    def read(self, feature_id):
+        """int Vect_read_line	(	const struct Map_info * 	Map,
+                struct line_pnts * 	line_p,
+                struct line_cats * 	line_c,
+                int 	line
+                )
+import ctypes
+import pygrass
+import grass.lib.vector as libvect
+mun = pygrass.vector.Vector('boundary_municp_sqlite')
+mun.open() # init the Map_info struct
+c_points = libvect.Vect_new_line_struct()
+c_lcats = ctypes.pointer(libvect.line_cats())
+ftype = libvect.Vect_read_line(self.c_mapinfo, c_points,
+                               c_lcats, feature_id)
+mun.read(8700)
+        """
+        if feature_id != 0:
+            c_points = libvect.Vect_new_line_struct()
+            c_lcats = ctypes.pointer(libvect.line_cats())
+            ftype = libvect.Vect_read_line(self.c_mapinfo, c_points,
+                                           c_lcats, feature_id)
+            if GV_TYPE[ftype]['label'] == 'centroid':
+                return GV_TYPE[ftype]['obj'](v_id=feature_id, c_points=c_points)
+        else:
+            raise
+
+    def write(self):
+        pass
+
+    def rewrite(self):
+        pass
+
+    def delete(self):
+        pass
+
+    def restore(self):
+        pass
 
     def exist(self):
         if self.name:
@@ -191,23 +250,35 @@ class Vector(object):
         return bool(self.c_mapinfo.contents.open)
 
     def open(self, mode='r', layer='0', topology=None, overwrite=None):
+        # update topology attribute
         self.topology = topology if topology is not None else self.topology
+        # if topology open in a topological mode
         if self.topology:
             libvect.Vect_set_open_level(2)
+        # update the overwritw attribute
         self.overwrite = overwrite if overwrite is not None else self.overwrite
-        if mode == 'r':
+        # check if the mode is valid
+        if mode not in ('r', 'rw', 'w'):
+            raise TypeError("Mode not supported. Use one of: 'r', 'rw', 'w'.")
+        # check if the map exist
+        if self.exist() and mode == 'r':
             openvect = libvect.Vect_open_old2(self.c_mapinfo, self.name,
                                               self.mapset, layer)
-            if openvect == 1:
-                topology = False
-            elif openvect == 2:
-                topology = True
-            else:
-                raise
-        elif mode == 'w':
-            if libvect.Vect_open_new(self.c_mapinfo,
-                                     self.name, libvect.WITHOUT_Z) == -1:
-                raise  # TODO raise error, somwthing went wrong in GRASS
+        # If is in write mode
+        if mode == 'w':
+            openvect = libvect.Vect_open_new(self.c_mapinfo, self.name,
+                                             libvect.WITHOUT_Z)
+        elif mode == 'rw':
+            openvect = libvect.Vect_open_update2(self.c_mapinfo, self.name,
+                                                     self.mapset, layer)
+        # check the C function result.
+        if openvect == 1:
+            self.topology = False
+        elif openvect == 2:
+            self.topology = True
+        else:
+            raise OpenError("Not able to open the map, something wrong.")
+        # initialize the dblinks object
         self.dblinks = DBlinks(self.c_mapinfo)
 
     def close(self):
