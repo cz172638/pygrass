@@ -100,7 +100,9 @@ class Bbox(object):
 
 class BoxList(object):
     def __init__(self, boxlist=None):
-        self.c_boxlist = libvect.Vect_new_boxlist(1)
+        self.c_boxlist = ctypes.pointer(libvect.boxlist())
+        # if set to 0, the list will hold only ids and no boxes
+        self.c_boxlist.contents.have_boxes = 1
         if boxlist is not None:
             for box in boxlist:
                 self.append(box)
@@ -215,7 +217,7 @@ class Ilist(object):
     """Instantiate a list of integer using the C GRASS struct ``ilist``,
     the class contains this struct as ``c_ilist`` attribute. """
     def __init__(self, integer_list=None):
-        self.c_ilist = libvect.Vect_new_list()
+        self.c_ilist = ctypes.pointer(libvect.struct_ilist())
         if integer_list is not None:
             self.extend(integer_list)
 
@@ -289,17 +291,20 @@ class Cats(object):
     that could be use by C functions.
     """
 
-    def __init__(self, c_mapinfo, area_id):
+    def __init__(self, c_mapinfo, v_id, c_cats=None):
         self.c_mapinfo = c_mapinfo
-        self.area_id = area_id
-        self.c_cats = libvect.Vect_new_cats_struct()
-        self.get_cats()
+        self.id = v_id
+        if c_cats is not None:
+            self.c_cats = c_cats
+        else:
+            self.c_cats = ctypes.pointer(libvect.line_cats())
+            self.get_area_cats()
 
-    def get_cats(self):
+    def get_area_cats(self):
         """Get area categories, set the c_cats struct given an area, using the
         ``Vect_get_area_cats`` function.
         """
-        libvect.Vect_get_area_cats(self.c_mapinfo, self.area_id, self.c_cats)
+        libvect.Vect_get_area_cats(self.c_mapinfo, self.id, self.c_cats)
 
     def reset(self):
         """Reset the C cats struct from previous values."""

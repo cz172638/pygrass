@@ -21,8 +21,6 @@ sys.path.append("%s/.." % vectorpath)
 from basic import Ilist, Bbox, Cats
 
 
-
-
 WKT = {'POINT\((.*)\)': 'point',  # 'POINT\(\s*([+-]*\d+\.*\d*)+\s*\)'
        'LINESTRING\((.*)\)': 'line'}
 
@@ -116,16 +114,27 @@ def get_xyz(pnt):
 
 
 class Geo(object):
-    def __init__(self, v_id=None, c_mapinfo=None, c_points=None, c_lcats=None):
+    """
+    >>> geo0 = Geo()
+    >>> points = ctypes.pointer(libvect.line_pnts())
+    >>> cats = ctypes.pointer(libvect.line_cats())
+    >>> geo1 = Geo(c_points=points, c_cats=cats)
+    """
+    def __init__(self, v_id=None, c_mapinfo=None, c_points=None, c_cats=None):
         self.id = v_id  # vector id
         self.c_mapinfo = c_mapinfo
-        self.c_lcats = c_lcats
 
         # set c_points
         if c_points is None:
-            self.c_points = libvect.Vect_new_line_struct()
+            self.c_points = ctypes.pointer(libvect.line_pnts())
         else:
             self.c_points = c_points
+
+        # set c_cats
+        if c_cats is None:
+            self.c_cats = ctypes.pointer(libvect.line_cats())
+        else:
+            self.c_cats = c_cats
 
     def is_with_topology(self):
         if self.c_mapinfo is not None:
@@ -136,14 +145,13 @@ class Geo(object):
     def read(self):
         """Read and set the coordinates of the centroid from the vector map,
         using the centroid_id and calling the Vect_read_line C function"""
-        #self.c_points = libvect.Vect_new_line_struct()
         libvect.Vect_read_line(self.c_mapinfo, self.c_points,
-                               self.c_lcats, self.id)
+                               self.c_cats, self.id)
 
     def write(self):
         """Write the centroid to the Map."""
         libvect.Vect_write_line(self.c_mapinfo, libvect.GV_CENTROID,
-                                self.c_points, self.c_lcats)
+                                self.c_points, self.c_cats)
 
 
 class Point(Geo):
@@ -802,7 +810,7 @@ class Node(object):
     pass
 
 
-class Boundary(Geo):
+class Boundary(Line):
     """
     """
     def __init__(self, area_id=None, lines=None, left=None, right=None,
@@ -819,6 +827,9 @@ class Boundary(Geo):
         self.right = Ilist()
         # geometry type
         self.gtype = libvect.GV_BOUNDARY
+
+    def __repr__(self):
+        return "Boundary(v_id=%r)" % self.id
 
     def boundaries(self):
         """Returna Ilist object with the line id"""
@@ -861,8 +872,8 @@ class Centroid(Point):
         elif self.c_mapinfo and self.area_id and self.id is None:
             self.id = self.get_centroid_id()
         if self.area_id is not None:
-            self.cats = Cats(c_mapinfo=self.c_mapinfo, area_id=self.area_id)
-            #import pdb; pdb.set_trace()
+            self.cats = Cats(c_mapinfo=self.c_mapinfo, v_id=self.area_id)
+            #TODO: why not pass the self.id?
             self.read()
 
         # geometry type
@@ -887,8 +898,6 @@ class Centroid(Point):
         area_id = libvect.Vect_get_centroid_area(self.c_mapinfo,
                                                  self.id)
         return area_id if area_id != 0 else None
-
-
 
 
 class Isle(Geo):
