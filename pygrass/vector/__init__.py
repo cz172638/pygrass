@@ -146,6 +146,9 @@ class Vector(object):
         else:
             return "Vector(%r)" % self.name
 
+    def __del__(self):
+        self.close()
+
     def next(self):
         """::
 
@@ -456,9 +459,10 @@ class Vector(object):
         self.dblinks = DBlinks(self.c_mapinfo)
 
     def close(self):
-        if libvect.Vect_close(self.c_mapinfo) != 0:
-            str_err = 'Error when trying to close the map with Vect_close'
-            raise GrassError(str_err)
+        if self.isopen():
+            if libvect.Vect_close(self.c_mapinfo) != 0:
+                str_err = 'Error when trying to close the map with Vect_close'
+                raise GrassError(str_err)
 
     def bbox(self):
         """Return the BBox of the vecor map
