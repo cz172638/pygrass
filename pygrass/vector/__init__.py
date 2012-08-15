@@ -19,6 +19,12 @@ from errors import GrassError, OpenError
 from basic import Bbox
 from table import DBlinks
 
+
+_MAPTYPE = {libvect.GV_FORMAT_NATIVE: "native",
+            libvect.GV_FORMAT_OGR: "OGR",
+            libvect.GV_FORMAT_OGR_DIRECT: "OGR",
+            libvect.GV_FORMAT_POSTGIS: "PostGIS"}
+
 _NUMOF = {"areas": libvect.Vect_get_num_areas,
           "dblinks": libvect.Vect_get_num_dblinks,
           "faces": libvect.Vect_get_num_faces,
@@ -98,6 +104,10 @@ class Vector(object):
         """
         #return (self.read(f_id) for f_id in xrange(self.num_of_features()))
         return self
+
+    @property
+    def maptype(self):
+        return _MAPTYPE[libvect.Vect_maptype(self.c_mapinfo)]
 
     def next(self):
         """::
