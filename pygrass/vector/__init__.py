@@ -5,6 +5,7 @@ Created on Tue Jul 17 08:51:53 2012
 @author: pietro
 """
 import ctypes
+import datetime
 import grass.lib.vector as libvect
 from vector_type import VTYPE, GV_TYPE
 import geometry as geo
@@ -54,92 +55,191 @@ _GEOOBJ = {"areas": geo.Area,
 # VECTOR
 #=============================================
 
-class Vector(object):
-    """ ::
+class Info(object):
+    """Basic vector info.
+    To get access to the vector info the map must be opened. ::
 
-        >>> from pygrass.vector import Vector
-        >>> municip = Vector('boundary_municp_sqlite')
-        >>> municip.is_open()
-        False
-        >>> municip.mapset
+        >>> municip = Info('boundary_municp', 'PERMANENT')
+        >>> municip.open()
+
+    Then it is possible to read and write the following map attributes: ::
+
+        >>> municip.organization
+        'NC OneMap'
+        >>> municip.person
+        'helena'
+        >>> municip.title
+        'North Carolina municipality boundaries (polygon map)'
+        >>> municip.map_date
+        datetime.datetime(2006, 11, 7, 0, 1, 27)
+        >>> municip.date
         ''
+        >>> municip.scale
+        1
+        >>> municip.comment
+        ''
+        >>> municip.comment = "One useful comment!"
+        >>> municip.comment
+        'One useful comment!'
+        >>> municip.zone
+        0
+        >>> municip.proj
+        99
+
+    There are some read only attributes: ::
+
+        >>> municip.full_name
+        'boundary_municp@PERMANENT'
+        >>> municip.proj_name
+        'Lambert Conformal Conic'
+        >>> municip.maptype
+        'native'
+
+    And some basic methods: ::
+
+        >>> municip.is_3D()
+        False
         >>> municip.exist()
         True
-        >>> municip.mapset
-        'user1'
-        >>> municip.overwrite
-        False
+        >>> municip.is_open()
+        True
+        >>> municip.close()
 
-    ..
     """
-
     def __init__(self, name, mapset=''):
         # Set map name and mapset
-        self.name = name
+        self._name = name
         self.mapset = mapset
         self.c_mapinfo = ctypes.pointer(libvect.Map_info())
-        self._spatial_index = libvect.spatial_index()
         self._topo_level = 1
         self._class_name = 'Vector'
         self.overwrite = False
-        self.dblinks = None
+        self.date_fmt =  '%a %b  %d %H:%M:%S %Y'
 
-    def __repr__(self):
-        if self.exist():
-            return "%s(%r, %r)" % (self._class_name, self.name, self.mapset)
+    def _get_name(self):
+        if self.exist() and self.is_open():
+            return libvect.Vect_get_name(self.c_mapinfo)
         else:
-            return "%s(%r)" % (self._class_name, self.name)
+            return self._name
 
-    def __iter__(self):
-        """::
+    def _set_name(self, newname):
+        self.rename(newname)
 
-            >>> mun = Vector('boundary_municp_sqlite')
-            >>> mun.open()
-            >>> features = [feature for feature in mun]
-            >>> features[:3]
-            [Boundary(v_id=None), Boundary(v_id=None), Boundary(v_id=None)]
-            >>> mun.close()
+    name = property(fget=_get_name, fset=_set_name)
 
-        ..
-        """
-        #return (self.read(f_id) for f_id in xrange(self.num_of_features()))
-        return self
+#    @property
+#    def mapset(self):
+#        return libvect.Vect_get_mapset(self.c_mapinfo)
+
+    def _get_organization(self):
+        return libvect.Vect_get_organization(self.c_mapinfo)
+
+    def _set_organization(self, org):
+        libvect.Vect_get_organization(self.c_mapinfo, ctypes.c_char_p(org))
+
+    organization = property(fget=_get_organization, fset=_set_organization)
+
+    def _get_date(self):
+        return libvect.Vect_get_date(self.c_mapinfo)
+
+    def _set_date(self, date):
+        return libvect.Vect_set_date(self.c_mapinfo, ctypes.c_char_p(date))
+
+    date = property(fget=_get_date, fset=_set_date)
+
+    def _get_person(self):
+        return libvect.Vect_get_person(self.c_mapinfo)
+
+    def _set_person(self, person):
+        libvect.Vect_set_person(self.c_mapinfo, ctypes.c_char_p(person))
+
+    person = property(fget=_get_person, fset=_set_person)
+
+    def _get_title(self):
+        return libvect.Vect_get_map_name(self.c_mapinfo)
+
+    def _set_title(self, title):
+        libvect.Vect_set_map_name(self.c_mapinfo, ctypes.c_char_p(title))
+
+    title = property(fget=_get_title, fset=_set_title)
+
+    def _get_map_date(self):
+        date_str = libvect.Vect_get_map_date(self.c_mapinfo)
+        return datetime.datetime.strptime(date_str, self.date_fmt)
+
+    def _set_map_date(self, datetimeobj):
+        date_str = datetimeobj.strftime(self.date_fmt)
+        libvect.Vect_set_map_date(self.c_mapinfo, ctypes.c_char_p(map_date))
+
+    map_date = property(fget=_get_map_date, fset=_set_map_date)
+
+    def _get_scale(self):
+        return libvect.Vect_get_scale(self.c_mapinfo)
+
+    def _set_scale(self, scale):
+        return libvect.Vect_set_scale(self.c_mapinfo, ctypes.c_int(scale))
+
+    scale = property(fget=_get_scale, fset=_set_scale)
+
+    def _get_comment(self):
+        return libvect.Vect_get_comment(self.c_mapinfo)
+
+    def _set_comment(self, comm):
+        return libvect.Vect_set_comment(self.c_mapinfo, ctypes.c_char_p(comm))
+
+    comment = property(fget=_get_comment, fset=_set_comment)
+
+    def _get_zone(self):
+        return libvect.Vect_get_zone(self.c_mapinfo)
+
+    def _set_zone(self, zone):
+        return libvect.Vect_set_zone(self.c_mapinfo, ctypes.c_int(zone))
+
+    zone = property(fget=_get_zone, fset=_set_zone)
+
+    def _get_proj(self):
+        return libvect.Vect_get_proj(self.c_mapinfo)
+
+    def _set_proj(self, proj):
+        libvect.Vect_set_proj(self.c_mapinfo, ctypes.c_int(proj))
+
+    proj = property(fget=_get_proj, fset=_set_proj)
+
+    def _get_thresh(self):
+        return libvect.Vect_get_thresh(self.c_mapinfo)
+
+    def _set_thresh(self, thresh):
+        return libvect.Vect_set_thresh(self.c_mapinfo, ctypes.c_double(thresh))
+
+    thresh = property(fget=_get_thresh, fset=_set_thresh)
+
+    @property
+    def full_name(self):
+        return libvect.Vect_get_full_name(self.c_mapinfo)
 
     @property
     def maptype(self):
         return _MAPTYPE[libvect.Vect_maptype(self.c_mapinfo)]
 
-    def next(self):
-        """::
+    @property
+    def proj_name(self):
+        return libvect.Vect_get_proj_name(self.c_mapinfo)
 
-            >>> mun = Vector('boundary_municp_sqlite')
-            >>> mun.open()
-            >>> mun.next()
-            Boundary(v_id=None)
-            >>> mun.next()
-            Boundary(v_id=None)
-            >>> mun.close()
+    def _write_header(self):
+        libvect.Vect_write_header(self.c_mapinfo)
 
-        ..
-        """
-        v_id = self.c_mapinfo.contents.next_line
-        v_id = v_id if v_id != 0 else None
-        c_points = ctypes.pointer(libvect.line_pnts())
-        c_cats = ctypes.pointer(libvect.line_cats())
-        ftype = libvect.Vect_read_next_line(self.c_mapinfo, c_points, c_cats)
-        if ftype == -2:
-            raise StopIteration()
-        if ftype == -1:
-            raise
-        #if  GV_TYPE[ftype]['obj'] is not None:
-        return GV_TYPE[ftype]['obj'](v_id=v_id,
-                                     c_mapinfo=self.c_mapinfo,
-                                     c_points=c_points,
-                                     c_cats=c_cats)
+    def rename(self, newname):
+        """Rename the map"""
+        if self.exist():
+            env.rename(self.name, newname, 'vect')
+        self._name = newname
+
+    def is_3D(self):
+        return bool(libvect.Vect_is_3d(self.c_mapinfo))
 
     def exist(self):
-        if self.name:
-            self.mapset = env.get_mapset_vector(self.name, self.mapset)
+        if self._name:
+            self.mapset = env.get_mapset_vector(self._name, self.mapset)
         else:
             return False
         if self.mapset:
@@ -192,6 +292,86 @@ class Vector(object):
                 str_err = 'Error when trying to close the map with Vect_close'
                 raise GrassError(str_err)
 
+
+#=============================================
+# VECTOR
+#=============================================
+
+class Vector(Info):
+    """ ::
+
+        >>> from pygrass.vector import Vector
+        >>> municip = Vector('boundary_municp_sqlite')
+        >>> municip.is_open()
+        False
+        >>> municip.mapset
+        ''
+        >>> municip.exist()
+        True
+        >>> municip.mapset
+        'user1'
+        >>> municip.overwrite
+        False
+
+    ..
+    """
+    def __init__(self, name, mapset=''):
+        # Set map name and mapset
+        super(Vector, self).__init__(name, mapset)
+        self._topo_level = 1
+        self._class_name = 'Vector'
+        self.overwrite = False
+        self.dblinks = None
+
+    def __repr__(self):
+        if self.exist():
+            return "%s(%r, %r)" % (self._class_name, self.name, self.mapset)
+        else:
+            return "%s(%r)" % (self._class_name, self.name)
+
+    def __iter__(self):
+        """::
+
+            >>> mun = Vector('boundary_municp_sqlite')
+            >>> mun.open()
+            >>> features = [feature for feature in mun]
+            >>> features[:3]
+            [Boundary(v_id=None), Boundary(v_id=None), Boundary(v_id=None)]
+            >>> mun.close()
+
+        ..
+        """
+        #return (self.read(f_id) for f_id in xrange(self.num_of_features()))
+        return self
+
+    def next(self):
+        """::
+
+            >>> mun = Vector('boundary_municp_sqlite')
+            >>> mun.open()
+            >>> mun.next()
+            Boundary(v_id=None)
+            >>> mun.next()
+            Boundary(v_id=None)
+            >>> mun.close()
+
+        ..
+        """
+        v_id = self.c_mapinfo.contents.next_line
+        v_id = v_id if v_id != 0 else None
+        c_points = ctypes.pointer(libvect.line_pnts())
+        c_cats = ctypes.pointer(libvect.line_cats())
+        ftype = libvect.Vect_read_next_line(self.c_mapinfo, c_points, c_cats)
+        if ftype == -2:
+            raise StopIteration()
+        if ftype == -1:
+            raise
+        #if  GV_TYPE[ftype]['obj'] is not None:
+        return GV_TYPE[ftype]['obj'](v_id=v_id,
+                                     c_mapinfo=self.c_mapinfo,
+                                     c_points=c_points,
+                                     c_cats=c_cats)
+
     def bbox(self):
         """Return the BBox of the vecor map
         """
@@ -242,8 +422,8 @@ class Vector(object):
 #=============================================
 
 class VectTopo(Vector):
-    def __init__(self, *args, **kargs):
-        super(VectTopo, self).__init__(*args, **kargs)
+    def __init__(self, name, mapset=''):
+        super(VectTopo, self).__init__(name, mapset)
         self._topo_level = 2
         self._class_name = 'VectTopo'
 
