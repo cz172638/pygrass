@@ -1,0 +1,42 @@
+++++
+News
+++++
+
+0.1 alpha
+=========
+
+*Release date: 20-Aug-2012*
+
+Modules
+-------
+
+- Call GRASS modules as object;
+- Change the attributes values;
+- Execute/kill/wait the process;
+- get the ``std_out`` and ``std_err``;
+- Allow GRASS modules to behave like a python function.
+
+Raster
+------
+
+- Read/write the history of a raster map;
+- Read/write the categories of a raster map.
+- Access to the raster row by row;
+- Access to the raster using a row cache with rowio;
+- Access to the raster using a tile cache in read and write mode;
+- See raster map as a numpy array using memcache;
+
+Vector
+------
+
+- Read/write the ``head`` information of a vector map;
+- Read/write to the table attributes of a vector map;
+- Add/rename/remove/cast table columns (only with postgreSQL);
+- Build a SQL query using the Filter class;
+- Access to the basic geometry features of the vector map.
+
+Other
+-----
+
+- Open a new `website <http://code.google.com/p/pygrass>`_ to host the project.
+- Configure a website to host the `documentation <http://www.ing.unitn.it/~zambelli/projects/pygrass/>`_
