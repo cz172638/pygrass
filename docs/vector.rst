@@ -4,9 +4,9 @@ Vector
 
 Instantiation and basic interaction. ::
 
-    >>> from pygrass.vector import Vector
-    >>> municip = Vector('boundary_municp')
-    >>> municip.isopen()
+    >>> from pygrass.vector import VectTopo
+    >>> municip = VectTopo('boundary_municp_sqlite')
+    >>> municip.is_open()
     False
     >>> municip.mapset
     ''
@@ -19,7 +19,7 @@ Instantiation and basic interaction. ::
 
 Open the map with topology: ::
 
-    >>> municip.open(topology=True)
+    >>> municip.open()
 
     get the number of primitive:
     >>> municip.num_primitive_of('line')
@@ -95,7 +95,7 @@ or you may have only the list of the areas that contain isles inside, with: ::
 Of course is still possible work only with a specific area, with: ::
 
     >>> from pygrass.vector.geometry import Area
-    >>> area = Area(vid=1859, c_mapinfo=municip.c_mapinfo)
+    >>> area = Area(v_id=1859, c_mapinfo=municip.c_mapinfo)
     >>> area.area()
     39486.05401495844
     >>> area.bbox()  # north, south, east, west
@@ -106,13 +106,29 @@ Of course is still possible work only with a specific area, with: ::
 
 Now, find an area with an island inside... ::
 
-    >>> area = Area(vid=2972, c_mapinfo=municip.c_mapinfo)
+    >>> area = Area(v_id=2972, c_mapinfo=municip.c_mapinfo)
     >>> area.isles                                       # doctest: +ELLIPSIS
     Isles([Isle(1538), Isle(1542), Isle(1543), ..., Isle(2571)])
     >>> isle = area.isles[0]
     >>> isle.bbox()
     Bbox(199947.296494, 199280.969494, 754920.623987, 754351.812986)
 
+
+VectorTopo
+----------
+
+.. autoclass:: pygrass.vector.VectTopo
+    :members:
+
+Vector
+----------
+
+.. autoclass:: pygrass.vector.Vector
+    :members:
+
+
+Vector Features
+===============
 
 Point
 ------
@@ -150,4 +166,32 @@ Area
 --------
 
 .. autoclass:: pygrass.vector.geometry.Boundary
+    :members:
+
+Utils
+=====
+
+Bbox
+----
+
+.. autoclass:: pygrass.vector.basic.Bbox
+    :members:
+
+
+BoxList
+--------
+
+.. autoclass:: pygrass.vector.basic.BoxList
+    :members:
+
+Ilist
+-----
+
+.. autoclass:: pygrass.vector.basic.Ilist
+    :members:
+
+Cats
+-----
+
+.. autoclass:: pygrass.vector.basic.Cats
     :members:

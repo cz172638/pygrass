@@ -4,16 +4,15 @@ Created on Mon Jun 11 18:02:27 2012
 
 @author: pietro
 """
+import ctypes
 import grass.lib.gis as libgis
 import grass.lib.raster as libraster
 import grass.lib.segment as libseg
 from raster_type import TYPE as RTYPE
-import ctypes
-import numpy as np
 
 
 class Segment(object):
-    def __init__(self, srows = 64, scols = 64, maxmem = 100):
+    def __init__(self, srows=64, scols=64, maxmem=100):
         self.srows = srows
         self.scols = scols
         self.maxmem = maxmem
@@ -28,52 +27,59 @@ class Segment(object):
     def nseg(self):
         rows = self.rows()
         cols = self.cols()
-        return ( ( rows + self.srows - 1 ) / self.srows ) * \
-               ( ( cols + self.scols - 1 ) / self.scols )
+        return ((rows + self.srows - 1) / self.srows) * \
+               ((cols + self.scols - 1) / self.scols)
 
     def segments_in_mem(self):
         if self.maxmem > 0 and self.maxmem < 100:
-            seg_in_mem = ( self.maxmem * self.nseg() ) / 100
+            seg_in_mem = (self.maxmem * self.nseg()) / 100
         else:
-            seg_in_mem = 4 * ( self.rows() / self.srows + \
-                               self.cols() / self.scols + 2 )
-        if seg_in_mem == 0: seg_in_mem = 1
+            seg_in_mem = 4 * (self.rows() / self.srows +
+                              self.cols() / self.scols + 2)
+        if seg_in_mem == 0:
+            seg_in_mem = 1
         return seg_in_mem
 
     def open(self, mapobj):
-        """Open a segment
+        """Open a segment it is necessary to pass a RasterSegment object.
+
         """
         self.val = RTYPE[mapobj.mtype]['grass def']()
-        size = ctypes.sizeof( RTYPE[mapobj.mtype]['ctypes'] )
+        size = ctypes.sizeof(RTYPE[mapobj.mtype]['ctypes'])
         file_name = libgis.G_tempfile()
         #import pdb; pdb.set_trace()
         libseg.segment_open(ctypes.byref(self.cseg), file_name,
-                                         self.rows(), self.cols(),
-                                         self.srows, self.scols,
-                                         size,
-                                         self.nseg())
+                            self.rows(), self.cols(),
+                            self.srows, self.scols,
+                            size,
+                            self.nseg())
         self.flush()
 
-    def format(self, mapobj, file_name = '', fill = True):
-        """TODO: add documentation
+    def format(self, mapobj, file_name='', fill=True):
+        """The segmentation routines require a disk file to be used for paging
+        segments in and out of memory. This routine formats the file open for
+        write on file descriptor fd for use as a segment file.
         """
-        if file_name == '': file_name = libgis.G_tempfile()
+        if file_name == '':
+            file_name = libgis.G_tempfile()
         mapobj.temp_file = file(file_name, 'w')
-        size = ctypes.sizeof( RTYPE[mapobj.mtype]['ctypes'] )
+        size = ctypes.sizeof(RTYPE[mapobj.mtype]['ctypes'])
         if fill:
             libseg.segment_format(mapobj.temp_file.fileno(), self.rows(),
                                   self.cols(), self.srows, self.scols, size)
         else:
-            libseg.segment_format_nofill(mapobj.temp_file.fileno(),self.rows(),
-                                  self.cols(), self.srows, self.scols, size)
+            libseg.segment_format_nofill(mapobj.temp_file.fileno(),
+                                         self.rows(), self.cols(),
+                                         self.srows, self.scols, size)
         # TODO: why should I close and then re-open it?
         mapobj.temp_file.close()
 
-    def init(self, mapobj, file_name = ''):
-        if file_name == '': file_name = mapobj.temp_file.name
+    def init(self, mapobj, file_name=''):
+        if file_name == '':
+            file_name = mapobj.temp_file.name
         mapobj.temp_file = open(file_name, 'w')
         libseg.segment_init(ctypes.byref(self.cseg), mapobj.temp_file.fileno(),
-                            self.segments_in_mem )
+                            self.segments_in_mem)
 
     def get_row(self, row_index, buf):
         """Return the row using, the `segment` method"""
@@ -101,7 +107,7 @@ class Segment(object):
         """Return the segment number
         """
         return row_index / self.srows * self.cols / self.scols + \
-               col_index / self.scols
+            col_index / self.scols
 
     def flush(self):
         """Flush pending updates to disk.

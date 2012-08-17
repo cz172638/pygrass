@@ -27,27 +27,27 @@ Class Name                  C library                Read      Write
 
 
 All these classes share common methods and attributes, necessary to address
-common tasks as rename, remove, open, close, exist, isopen.
+common tasks as rename, remove, open, close, exist, is_open.
 In the next exmples we instantiate a RasterRow object. ::
 
-    >>> import pygrass
-    >>> elev = pygrass.RasterRow('elevation')
+    >>> from pygrass import raster
+    >>> elev = raster.RasterRow('elevation')
     >>> elev.name
     'elevation'
     >>> print(elev)
     elevation@PERMANENT
     >>> elev.exist()
     True
-    >>> elev.isopen()
+    >>> elev.is_open()
     False
-    >>> new = pygrass.RasterRow('new')
+    >>> new = raster.RasterRow('new')
     >>> new.exist()
     False
-    >>> new.isopen()
+    >>> new.is_open()
     False
 
 
-We can rename the map:   ::
+We can rename the map: ::
 
     >>> # setting the attribute
     >>> new.name = 'new_map'
@@ -77,7 +77,7 @@ It is possible to check if the map has or not the categories with the
 Opening a map that has category, for example the "landcove_1m" raster map
 from the North Carolina mapset. The ``has_cats`` method return True. ::
 
-    >>> land = pygrass.RasterRow('landcover_1m')
+    >>> land = raster.RasterRow('landcover_1m')
     >>> land.has_cats()
     True
 
@@ -167,12 +167,12 @@ The RasterRow class allow to read in a randomly order the row from a map, but
 it is only possible to write the map using only a sequence order, therefore every
 time you are writing a new map, the row is add to the file as the last row. ::
 
-    >>> pygrass = reload(pygrass)
-    >>> elev = pygrass.RasterRow('elevation')
+    >>> raster = reload(raster)
+    >>> elev = raster.RasterRow('elevation')
     >>> # the cols attribute is set from the current region only when the map is open
     >>> elev.cols
     >>> elev.open()
-    >>> elev.isopen()
+    >>> elev.is_open()
     True
     >>> elev.cols
     1500
@@ -184,7 +184,7 @@ time you are writing a new map, the row is add to the file as the last row. ::
     [ 144.56524658  144.58493042  144.86477661]
     [ 144.99488831  145.22894287  145.57142639]
     >>> # we can open a new map in write mode
-    >>> new = pygrass.RasterRow('new')
+    >>> new = raster.RasterRow('new')
     >>> new.open('w', 'CELL')
     >>> # for each elev row we can perform computation, and write the result into
     >>> # the new map
@@ -222,8 +222,8 @@ raster rows can only be written in sequential order, writing by row id is not
 supported by design. Hence, we should use the rowio lib only for caching rows
 for reading and use the default row write access as in the RasterRow class. ::
 
-    >>> pygrass = reload(pygrass)
-    >>> elev = pygrass.RasterRowIO('elevation')
+    >>> raster = reload(raster)
+    >>> elev = raster.RasterRowIO('elevation')
     >>> elev.open('r')
     >>> for row in elev[:5]: print(row[:3])
     [ 141.99613953  141.27848816  141.37904358]
@@ -245,8 +245,8 @@ the raster map into small different files, that grass read load into the memory
 and write to the hardisk.
 The segment library allow to open a map in a read-write mode. ::
 
-    >>> pygrass = reload(pygrass)
-    >>> elev = pygrass.RasterSegment('elevation')
+    >>> raster = reload(raster)
+    >>> elev = raster.RasterSegment('elevation')
     >>> elev.open()
     >>> for row in elev[:5]: print(row[:3])
     [ 141.99613953  141.27848816  141.37904358]
@@ -254,7 +254,7 @@ The segment library allow to open a map in a read-write mode. ::
     [ 143.81854248  143.54707336  143.83972168]
     [ 144.56524658  144.58493042  144.86477661]
     [ 144.99488831  145.22894287  145.57142639]
-    >>> new = pygrass.RasterSegment('new')
+    >>> new = raster.RasterSegment('new')
     >>> new.open('w', 'CELL')
     >>> for irow in xrange(elev.rows):
     ...     new[irow] = elev[irow] < 144
@@ -313,8 +313,8 @@ The RasterNumpy class, is based on the `numpy.memmap`_ class If you open an
 existing map, the map will be copied on a binary format, and read to avoid
 to load all the map in memory. ::
 
-    >>> import pygrass
-    >>> elev = pygrass.RasterNumpy('elevation', 'PERMANENT')
+    >>> raster = reload(raster)
+    >>> elev = raster.RasterNumpy('elevation', 'PERMANENT')
     >>> elev.open('r')
     >>> for row in elev[:5]: print(row[:3])
     [ 141.99613953  141.27848816  141.37904358]
@@ -346,6 +346,53 @@ to load all the map in memory. ::
 
 
 
+.. _Buffer-label:
+
+Buffer
+------
+
+The buffer class is used to interact with a memory buffer of a map like a
+raster row. The buffer class is based on the `numpy.ndarray`_ class. Therefore
+all the nice feature of the ndarray are allowed.
+
+.. autoclass:: pygrass.raster.buffer.Buffer
+    :members:
+
+.. _numpy.ndarray: http://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.html
+
+
+.. _RowIO-label:
+
+RowIO
+------
+
+.. autoclass:: pygrass.raster.rowio.RowIO
+    :members:
+
+.. _Segment-label:
+
+Segment
+-------
+
+.. autoclass:: pygrass.raster.segment.Segment
+    :members:
+
+.. _History-label:
+
+History
+--------
+
+.. autoclass:: pygrass.raster.history.History
+    :members:
+
+
+.. _Category-label:
+
+Category
+--------
+
+.. autoclass:: pygrass.raster.category.Category
+    :members:
 
 .. _Raster library: http://grass.osgeo.org/programming7/rasterlib.html/
 .. _RowIO library: http://grass.osgeo.org/programming7/rowiolib.html

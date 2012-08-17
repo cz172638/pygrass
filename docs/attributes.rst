@@ -107,11 +107,19 @@ a new cursor object and interact with the database. ::
 
 ..
     db.connect driver=sqlite database='$GISDBASE/$LOCATION_NAME/$MAPSET/sqlite.db'
+    g.copy vect=boundary_municp@PERMANENT,boundary_municp_sqlite
+    v.build --overwrite map=boundary_municp_sqlite@user1
     g.copy vect=boundary_municp@user1,boundary_municp_sqlite
 
     db.connect driver=pg database='host=localhost,dbname=grassdb'
     db.login user=pietro
     g.copy vect=boundary_municp@user1,boundary_municp_pg --o
+
+    db.connect driver=sqlite database=/home/pietro/docdat/phd/thesis/gis/north_carolina/user1/sqlite.db
+    g.copy --overwrite vect=boundary_municp_sqlite@user1,boundary
+
+    g.remove vect=boundary_municp@user1
+
 
 
 Link

@@ -7,18 +7,13 @@ Created on Wed Aug  8 15:29:21 2012
 
 
 """
-# import modules from python library
-from collections import OrderedDict
 import ctypes
+from collections import OrderedDict
+
 import grass.lib.vector as libvect
 import grass.script.core as core
-import sql
 
-import os
-import sys
-vectorpath = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(vectorpath)
-sys.path.append("%s/.." % vectorpath)
+import sql
 
 
 DRIVERS = ('sqlite', 'pg')
@@ -611,12 +606,12 @@ class Link(object):
 class DBlinks(object):
     """Interface containing link to the table DB. ::
 
-        >>> from vector import Vector
-        >>> municip = Vector('boundary_municp_sqlite')
-        >>> municip.open(topology=True)
+        >>> from pygrass.vector import VectTopo
+        >>> municip = VectTopo('boundary_municp_sqlite')
+        >>> municip.open()
         >>> dblinks = DBlinks(municip.c_mapinfo)
         >>> dblinks
-        DBlinks([[Link(1, boundary_municp, sqlite)]])
+        DBlinks([Link(1, boundary_municp, sqlite)])
         >>> dblinks[1]
         Link(1, boundary_municp, sqlite)
         >>> dblinks[0]                                    # doctest: +ELLIPSIS
@@ -651,7 +646,7 @@ class DBlinks(object):
             return self.by_name(key)
 
     def __repr__(self):
-        return "DBlinks([%r])" % [link for link in self.__iter__()]
+        return "DBlinks(%r)" % [link for link in self.__iter__()]
 
     def by_number(self, number):
         c_fieldinfo = libvect.Vect_get_field(self.c_mapinfo, number)
@@ -667,17 +662,17 @@ class DBlinks(object):
     def add(self, link):
         """Add a new link. ::
 
-            >>> from vector import Vector
-            >>> municip = Vector('boundary_municp_sqlite')
-            >>> municip.open(topology=True)
+            >>> from pygrass.vector import VectTopo
+            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> municip.open()
             >>> dblinks = DBlinks(municip.c_mapinfo)
             >>> dblinks
-            DBlinks([[Link(1, boundary_municp, sqlite)]])
+            DBlinks([Link(1, boundary_municp, sqlite)])
             >>> link = Link(2, 'pg_link', 'boundary_municp_pg', 'cat',
             ...             'host=localhost dbname=grassdb', 'pg')
             >>> dblinks.add(link)
             >>> dblinks   # need to open vector map in write mode
-
+            DBlinks([Link(1, boundary_municp, sqlite)])
 
         ..
         """
@@ -689,14 +684,15 @@ class DBlinks(object):
     def remove(self, key):
         """Remove a link. ::
 
-            >>> from vector import Vector
-            >>> municip = Vector('boundary_municp_sqlite')
-            >>> municip.open(topology=True)
+            >>> from pygrass.vector import VectTopo
+            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> municip.open()
             >>> dblinks = DBlinks(municip.c_mapinfo)
             >>> dblinks
-            DBlinks([[Link(1, boundary_municp, sqlite)]])
+            DBlinks([Link(1, boundary_municp, sqlite)])
             >>> dblinks.remove('pg_link')
             >>> dblinks  # need to open vector map in write mode
+            DBlinks([Link(1, boundary_municp, sqlite)])
 
         ..
         """

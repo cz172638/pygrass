@@ -4,15 +4,17 @@ Created on Fri May 25 12:55:14 2012
 
 @author: pietro
 """
+import grass.lib.gis as _libgis
+_libgis.G_gisinit('')
+import os as _os
+import sys as _sys
 
-import grass.lib.gis as libgis
-libgis.G_gisinit('')
-from buffer import Buffer
-from segment import Segment
-from rowio import RowIO
-from category import Category
-from history import History
-from raster import RasterRow, RasterSegment, RasterRowIO, RasterNumpy
-from region import Region
-import modules
+_pygrasspath = _os.path.dirname(_os.path.realpath( __file__ )).split(_os.sep)
+_sys.path.insert(0, _os.path.join(_pygrasspath[:-1]))
+
+import region
+import raster
 import vector
+import modules
+import errors
+import env

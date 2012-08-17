@@ -143,6 +143,7 @@ class BoxList(object):
             >>> boxlist.append(box2)
             >>> len(boxlist)
             3
+
         ..
         """
         indx = self.__len__()
@@ -157,6 +158,8 @@ class BoxList(object):
             >>> box2 = Bbox(5,6,7,8)
             >>> box3 = Bbox(9,8,7,6)
             >>> boxlist0 = BoxList([box0, box1])
+            >>> boxlist0
+            Boxlist([Bbox(0.0, 0.0, 0.0, 0.0), Bbox(1.0, 2.0, 3.0, 4.0)])
             >>> boxlist1 = BoxList([box2, box3])
             >>> len(boxlist0)
             2
@@ -166,8 +169,12 @@ class BoxList(object):
             >>> boxlist1.extend([box0, box1])
             >>> len(boxlist1)
             4
+
+        ..
         """
         if hasattr(boxlist, 'c_boxlist'):
+            #import pdb; pdb.set_trace()
+            # FIXME: doesn't work
             libvect.Vect_boxlist_append_boxlist(self.c_boxlist,
                                                 boxlist.c_boxlist)
         else:
@@ -184,6 +191,7 @@ class BoxList(object):
             ...                    Bbox(1, -1, -1, 1)])
             >>> boxlist.remove(0)
             >>> boxlist
+            Boxlist([Bbox(1.0, 0.0, 0.0, 1.0), Bbox(1.0, -1.0, -1.0, 1.0)])
 
         ..
         """

@@ -5,10 +5,12 @@ Created on Mon Jun 18 13:22:38 2012
 @author: pietro
 """
 import ctypes
+
 import grass.lib.rowio as librowio
 import grass.lib.raster as librast
+
+from pygrass.errors import GrassError
 from raster_type import TYPE as RTYPE
-from raster_type import RTYPE_STR
 
 
 CMPFUNC = ctypes.CFUNCTYPE(ctypes.c_int,
@@ -17,22 +19,28 @@ CMPFUNC = ctypes.CFUNCTYPE(ctypes.c_int,
 
 
 def getmaprow_CELL(fd, buf, row, l):
-    librast.Rast_get_f_row( fd, ctypes.cast(buf, ctypes.POINTER(librast.CELL)), row)
+    librast.Rast_get_f_row(fd, ctypes.cast(buf, ctypes.POINTER(librast.CELL)),
+                           row)
     return 1
+
 
 def getmaprow_FCELL(fd, buf, row, l):
-    librast.Rast_get_f_row( fd, ctypes.cast(buf, ctypes.POINTER(librast.FCELL)), row)
+    librast.Rast_get_f_row(fd, ctypes.cast(buf, ctypes.POINTER(librast.FCELL)),
+                           row)
     return 1
 
+
 def getmaprow_DCELL(fd, buf, row, l):
-    librast.Rast_get_f_row( fd, ctypes.cast(buf, ctypes.POINTER(librast.DCELL)), row)
+    librast.Rast_get_f_row(fd, ctypes.cast(buf, ctypes.POINTER(librast.DCELL)),
+                           row)
     return 1
 
 get_row = {
-    'CELL'  : CMPFUNC(getmaprow_CELL),
-    'FCELL' : CMPFUNC(getmaprow_FCELL),
-    'DCELL' : CMPFUNC(getmaprow_DCELL),
+    'CELL':  CMPFUNC(getmaprow_CELL),
+    'FCELL': CMPFUNC(getmaprow_FCELL),
+    'DCELL': CMPFUNC(getmaprow_DCELL),
 }
+
 
 class RowIO(object):
 
@@ -51,12 +59,11 @@ class RowIO(object):
         self.mtype = mtype
         self.row_size = ctypes.sizeof(RTYPE[mtype]['grass def'] * cols)
         if (librowio.Rowio_setup(ctypes.byref(self.crowio), self.fd,
-                             self.rows,
-                             self.row_size,
-                             get_row[self.mtype],
-                             get_row[self.mtype]) == -1):
-            print('fatal error, not setup correctly')
-            raise
+                                 self.rows,
+                                 self.row_size,
+                                 get_row[self.mtype],
+                                 get_row[self.mtype]) == -1):
+            raise GrassError('Fatal error, Rowio not setup correctly.')
 
     def release(self):
         librowio.Rowio_release(ctypes.byref(self.crowio))
@@ -65,9 +72,7 @@ class RowIO(object):
         self.cols = None
         self.mtype = None
 
-
     def get(self, row_index, buf):
         rowio_buf = librowio.Rowio_get(ctypes.byref(self.crowio), row_index)
-        ctypes.memmove(buf.p, rowio_buf, self.row_size )
+        ctypes.memmove(buf.p, rowio_buf, self.row_size)
         return buf
-

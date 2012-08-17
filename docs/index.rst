@@ -6,6 +6,18 @@
 Welcome to PyGrass's documentation!
 ===================================
 
+Since in the 2006 GRASS developers start to adopt python for the new GUI,
+python becoming more and more important and developers plan to convert all
+the bash scripts in to python for the next major release GRASS 7.
+
+``pygrass`` want to improve integration between GRASS and python, make the
+use of python under GRASS more consistent with the language itself and make
+the GRASS scripting and programming activity easier and more natural
+to the final users.
+
+This project has been funded with support from the google Summer of Code 2012.
+
+
 Contents:
 
 .. toctree::
@@ -13,9 +25,8 @@ Contents:
 
    raster
    vector
-   modules
    attributes
-
+   modules
 
 
 

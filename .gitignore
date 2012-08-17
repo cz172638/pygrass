@@ -1,7 +1,20 @@
+# Setuptools/Distribute's files
+*.egg-info
+/dist
+/build
+
+# Python's precompiled files
 *.pyc
 *.pyo
-*~
-.spyder*
-*.zip
-docs/_build/*
 
+# Spyder files
+.spyder*
+
+# backup files
+*~
+
+# zipped files
+*.zip
+
+# Sphinx's builds
+/docs/_build

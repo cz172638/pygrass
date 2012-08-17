@@ -5,18 +5,12 @@ Created on Wed Jul 18 10:46:25 2012
 @author: pietro
 
 """
-import grass.lib.gis as libgis
-#libgis.G_gisinit('')
 import ctypes
-import grass.lib.vector as libvect
-#from vector_type import VTYPE
 import numpy as np
 import re
-import sys
-import os
-vectorpath = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(vectorpath)
-sys.path.append("%s/.." % vectorpath)
+
+import grass.lib.gis as libgis
+import grass.lib.vector as libvect
 
 from basic import Ilist, Bbox, Cats
 
@@ -955,9 +949,9 @@ class Isle(Geo):
                                         border.c_points.contents.n_points)
 
     def perimeter(self):
-        """Return the perimeter value of an Isle
-
-        double Vect_area_perimeter (const struct line_pnts *Points)
+        """Return the perimeter value of an Isle.
+        ::
+            double Vect_area_perimeter()
 
         """
         border = self.points()

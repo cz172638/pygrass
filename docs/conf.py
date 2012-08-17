@@ -16,7 +16,7 @@ import sys, os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../'))
+sys.path.insert(0, os.path.abspath('../src/'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -85,6 +85,11 @@ pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
+
+# If true, doctest flags (comments looking like # doctest: FLAG, ...)
+# at the ends of lines and <BLANKLINE> markers are removed for all code blocks
+# showing interactive Python sessions (i.e. doctests). Default is true.
+trim_doctest_flags = True
 
 
 intersphinx_mapping = {'python': ('http://docs.python.org/2.7', None)}
