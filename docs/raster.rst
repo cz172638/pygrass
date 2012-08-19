@@ -316,12 +316,6 @@ to load all the map in memory. ::
     >>> raster = reload(raster)
     >>> elev = raster.RasterNumpy('elevation', 'PERMANENT')
     >>> elev.open('r')
-    >>> for row in elev[:5]: print(row[:3])
-    [ 141.99613953  141.27848816  141.37904358]
-    [ 142.90461731  142.39450073  142.68611145]
-    [ 143.81854248  143.54707336  143.83972168]
-    [ 144.56524658  144.58493042  144.86477661]
-    [ 144.99488831  145.22894287  145.57142639]
     >>> # in this case RasterNumpy is an extention of the numpy class
     >>> # therefore you may use all the fancy things of numpy.
     >>> elev[:5, :3]
@@ -341,7 +335,11 @@ to load all the map in memory. ::
     True
     >>> # give a name to the new map
     >>> el.name = 'new'
+    >>> el.exist()
+    False
     >>> el.close()
+    >>> el.exist()
+    True
     >>> el.remove()
 
 

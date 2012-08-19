@@ -520,7 +520,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         return self._mode
 
     def _set_mode(self, mode):
-        if mode.lower() not in ('r', 'w+','r+', 'c'):
+        if mode.lower() not in ('r', 'w+', 'r+', 'c'):
             raise ValueError(_("Mode type: {0} not supported.").format(mode))
         self._mode = mode
 
@@ -580,13 +580,12 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         r.in.bin input=/home/pietro/docdat/phd/thesis/gis/north_carolina/user1/.tmp/eraclito/14325.0 output=new title='' bytes=1,anull='' --verbose --overwrite north=228500.0 south=215000.0 east=645000.0 west=630000.0 rows=1350 cols=1500
 
         """
+        self.tofile(self.filename)
         size, kind = self._get_flags(self.dtype.itemsize, self.dtype.kind)
         #print size, kind
         if kind == 'i':
             kind = None
             size = 4
-        else:
-            kind
         size = None if kind == 'f' else size
 
         # To be set in the future
@@ -594,7 +593,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
         self.null = None
 
         #import pdb; pdb.set_trace()
-        if self.mode in ('w+','r+'):
+        if self.mode in ('w+', 'r+'):
             ret = grasscore.run_command('r.in.bin', flags=kind,
                                         input=self.filename, output=self._name,
                                         title=self.title, bytes=size,
