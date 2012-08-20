@@ -149,37 +149,37 @@ class BoxList(object):
         indx = self.__len__()
         libvect.Vect_boxlist_append(self.c_boxlist, indx, box.c_bbox.contents)
 
-    def extend(self, boxlist):
-        """Extend a boxlist with another boxlist or using a list of Bbox, using
-        ``Vect_boxlist_append_boxlist`` c function. ::
-
-            >>> box0 = Bbox()
-            >>> box1 = Bbox(1,2,3,4)
-            >>> box2 = Bbox(5,6,7,8)
-            >>> box3 = Bbox(9,8,7,6)
-            >>> boxlist0 = BoxList([box0, box1])
-            >>> boxlist0
-            Boxlist([Bbox(0.0, 0.0, 0.0, 0.0), Bbox(1.0, 2.0, 3.0, 4.0)])
-            >>> boxlist1 = BoxList([box2, box3])
-            >>> len(boxlist0)
-            2
-            >>> boxlist0.extend(boxlist1)
-            >>> len(boxlist0)
-            4
-            >>> boxlist1.extend([box0, box1])
-            >>> len(boxlist1)
-            4
-
-        ..
-        """
-        if hasattr(boxlist, 'c_boxlist'):
-            #import pdb; pdb.set_trace()
-            # FIXME: doesn't work
-            libvect.Vect_boxlist_append_boxlist(self.c_boxlist,
-                                                boxlist.c_boxlist)
-        else:
-            for box in boxlist:
-                self.append(box)
+#    def extend(self, boxlist):
+#        """Extend a boxlist with another boxlist or using a list of Bbox, using
+#        ``Vect_boxlist_append_boxlist`` c function. ::
+#
+#            >>> box0 = Bbox()
+#            >>> box1 = Bbox(1,2,3,4)
+#            >>> box2 = Bbox(5,6,7,8)
+#            >>> box3 = Bbox(9,8,7,6)
+#            >>> boxlist0 = BoxList([box0, box1])
+#            >>> boxlist0
+#            Boxlist([Bbox(0.0, 0.0, 0.0, 0.0), Bbox(1.0, 2.0, 3.0, 4.0)])
+#            >>> boxlist1 = BoxList([box2, box3])
+#            >>> len(boxlist0)
+#            2
+#            >>> boxlist0.extend(boxlist1)
+#            >>> len(boxlist0)
+#            4
+#            >>> boxlist1.extend([box0, box1])
+#            >>> len(boxlist1)
+#            4
+#
+#        ..
+#        """
+#        if hasattr(boxlist, 'c_boxlist'):
+#            #import pdb; pdb.set_trace()
+#            # FIXME: doesn't work
+#            libvect.Vect_boxlist_append_boxlist(self.c_boxlist,
+#                                                boxlist.c_boxlist)
+#        else:
+#            for box in boxlist:
+#                self.append(box)
 
     def remove(self, indx):
         """Remove Bbox from the boxlist, given an integer or a list of integer
