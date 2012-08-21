@@ -276,9 +276,9 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.add('n_pizza', 'int4')        # doctest: +ELLIPSIS
-            Traceback (most recent call last):
-              ...
-            DBError: 'SQLite does not support to add columns.'
+            >>> 'n_pizza' in cols_pg
+            True
+           
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -288,20 +288,16 @@ class Columns(object):
 
         .. warning ::
 
-            It is not possible to add/remove/rename a column with sqlite
+            It is not possible to remove/rename a column with sqlite
         ..
         """
-        if self.is_pg():
-            cur = self.conn.cursor()
-            cur.execute(sql.ADD_COL.format(tname=self.tname,
-                                           cname=col_name,
-                                           ctype=col_type))
-            self.conn.commit()
-            cur.close()
-            self.update_odict()
-        else:
-            # sqlite does not support rename columns:
-            raise DBError('SQLite does not support to add columns.')
+        cur = self.conn.cursor()
+        cur.execute(sql.ADD_COL.format(tname=self.tname,
+                                       cname=col_name,
+                                       ctype=col_type))
+        self.conn.commit()
+        cur.close()
+        self.update_odict()
 
     def rename(self, old_name, new_name):
         """Rename a column of the table. ::
