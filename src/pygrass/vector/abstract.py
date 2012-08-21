@@ -224,6 +224,9 @@ class Info(object):
 
         ..
         """
+        # check if map exists or not
+        if not self.exist():
+	    raise OpenError("<%s> not found" % self._name)
         if libvect.Vect_set_open_level(self._topo_level) != 0:
             raise OpenError("Invalid access level.")
         # update the overwrite attribute
