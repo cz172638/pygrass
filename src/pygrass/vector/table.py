@@ -745,7 +745,13 @@ class Table(object):
         self.filters = Filters(self.name)
 
     def __repr__(self):
-        return "Table(%r, %r, %r)" % (self.name, self.driver, self.database)
+        """::
+            
+            >>> tab_sqlite = Table('boundary_municp_sqlite')
+            
+        ..    
+        """
+        return "Table(%r)" % (self.name)
 
     def __iter__(self):
         cur = self.execute()
