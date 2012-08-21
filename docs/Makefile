@@ -3,7 +3,12 @@
 
 # You can set these variables from the command line.
 SPHINXOPTS    =
+ifneq (@(type sphinx-build2 > /dev/null),)
 SPHINXBUILD   = sphinx-build2
+endif
+ifneq (@(type sphinx-build > /dev/null),)
+SPHINXBUILD   = sphinx-build
+endif
 PAPER         =
 BUILDDIR      = _build
 
