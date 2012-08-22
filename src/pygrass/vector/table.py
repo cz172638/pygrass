@@ -132,9 +132,10 @@ class Columns(object):
 
     ..
     """
-    def __init__(self, tname, connection):
+    def __init__(self, tname, connection, key):
         self.tname = tname
         self.conn = connection
+        self.key = key
         self.odict = None
         self.update_odict()
 
@@ -206,8 +207,27 @@ class Columns(object):
                 odict[name] = ctype
             self.odict = odict
 
-    def sql_descr(self):
-        return ', '.join(['%s %s' % (key, val) for key, val in self.items()])
+    def sql_descr(self, remove = None):
+        """Return a string with description of columns.
+           Remove it is used to remove a columns.::
+
+            >>> import sqlite3
+            >>> path = '$GISDBASE/$LOCATION_NAME/$MAPSET/sqlite.db'
+            >>> cols_sqlite = Columns('boundary_municp_sqlite',
+            ...                       sqlite3.connect(get_path(path)))
+            >>> cols_sqlite.sql_descr()
+
+            >>> import psycopg2 as pg
+            >>> cols_pg = Columns('boundary_municp_pg',
+            ...                   pg.connect('host=localhost dbname=grassdb'))
+            >>> cols_pg.sql_descr()                           # doctest: +ELLIPSIS
+
+        """
+        if remove:
+            return ', '.join(['%s %s' % (key, val) for key, val in self.items()
+                            if key != remove])
+        else:
+            return ', '.join(['%s %s' % (key, val) for key, val in self.items()])
 
     def types(self):
         """Return a list with the column types. ::
@@ -229,8 +249,9 @@ class Columns(object):
         """
         return self.odict.values()
 
-    def names(self):
-        """Return a list with the column names. ::
+    def names(self, remove = None, unicod = True):
+        """Return a list with the column names.
+           Remove it is used to remove a columns.::
 
             >>> import sqlite3
             >>> path = '$GISDBASE/$LOCATION_NAME/$MAPSET/sqlite.db'
@@ -247,7 +268,15 @@ class Columns(object):
 
         ..
         """
-        return self.odict.keys()
+        if remove:
+            nams = self.odict.keys()
+            nams.remove(remove)
+        else:
+            nams = self.odict.keys()
+        if unicod:
+            return nams
+        else:
+            return [str(name) for name in nams]
 
     def items(self):
         """Return a list of tuple with column name and column type.  ::
@@ -402,9 +431,18 @@ class Columns(object):
             cur.close()
             self.update_odict()
         else:
-            # sqlite does not support rename columns:
-            raise DBError('SQLite does not support to drop columns.')
-
+            desc = str(self.sql_descr(remove=col_name))
+            names = ', '.join(self.names(remove=col_name, unicod=False))
+            cur = self.conn.cursor()
+            queries = sql.DROP_COL_SQLITE.format(tname=self.tname,
+                                                 keycol = self.key,
+                                                 coldef = desc,
+                                                 colnames = names).split('\n')
+            for query in queries:
+                cur.execute(query)
+            self.conn.commit()
+            cur.close()
+            self.update_odict()
 
 class Link(object):
     """Define a Link between vector map and the attributes table.
@@ -573,7 +611,7 @@ class Link(object):
 
         ..
         """
-        return Table(self.table_name, self.connection())
+        return Table(self.table_name, self.connection(), self.key)
 
     def info(self):
         """Print information of the link. ::
@@ -733,11 +771,13 @@ class Table(object):
 
     name = property(fget=_get_name, fset=_set_name)
 
-    def __init__(self, name, connection):
+    def __init__(self, name, connection, key):
         self._name = name
         self.conn = connection
+        self.key = key
         self.columns = Columns(self.name,
-                               self.conn)
+                               self.conn,
+                               self.key)
         self.filters = Filters(self.name)
 
     def __repr__(self):
