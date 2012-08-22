@@ -39,6 +39,9 @@ SELECT = "SELECT {cols} FROM {tname};"
 SELECT_WHERE = "SELECT {cols} FROM {tname} WHERE {condition};"
 SELECT_ORDERBY = "SELECT {cols} FROM {tname} ORDER BY {orderby};"
 
+#UPDATE
+UPDATE = "UPDATE {tname} SET {new_col} = {old_col};"
+UPDATE_WHERE = "UPDATE {tname} SET {new_col} = {old_col} WHERE {condition};"
 
 # GET INFO
 PRAGMA = "PRAGMA table_info({tname});"

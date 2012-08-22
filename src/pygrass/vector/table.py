@@ -354,8 +354,8 @@ class Columns(object):
             It is not possible to add/remove/rename a column with sqlite
         ..
         """
+        cur = self.conn.cursor()
         if self.is_pg():
-            cur = self.conn.cursor()
             cur.execute(sql.RENAME_COL.format(tname=self.tname,
                                               old_name=old_name,
                                               new_name=new_name))
@@ -363,8 +363,16 @@ class Columns(object):
             cur.close()
             self.update_odict()
         else:
-            # sqlite does not support rename columns:
-            raise DBError('SQLite does not support to rename columns.')
+            cur.execute(sql.ADD_COL.format(tname=self.tname,
+                                           cname=new_name,
+                                           ctype=str(self.odict[old_name])))
+            cur.execute(sql.UPDATE.format(tname=self.tname,
+                                          new_col=new_name,
+                                          old_col=old_name))
+            self.conn.commit()
+            cur.close()
+            self.update_odict()
+            self.drop(old_name)
 
     def cast(self, col_name, new_type):
         """Change the column type. ::
