@@ -423,26 +423,22 @@ class Columns(object):
             It is not possible to add/remove/rename a column with sqlite
         ..
         """
+        cur = self.conn.cursor()
         if self.is_pg():
-            cur = self.conn.cursor()
             cur.execute(sql.DROP_COL.format(tname=self.tname,
                                             cname=col_name))
-            self.conn.commit()
-            cur.close()
-            self.update_odict()
         else:
             desc = str(self.sql_descr(remove=col_name))
             names = ', '.join(self.names(remove=col_name, unicod=False))
-            cur = self.conn.cursor()
             queries = sql.DROP_COL_SQLITE.format(tname=self.tname,
                                                  keycol = self.key,
                                                  coldef = desc,
                                                  colnames = names).split('\n')
             for query in queries:
                 cur.execute(query)
-            self.conn.commit()
-            cur.close()
-            self.update_odict()
+        self.conn.commit()
+        cur.close()
+        self.update_odict()
 
 class Link(object):
     """Define a Link between vector map and the attributes table.
