@@ -132,7 +132,7 @@ class Columns(object):
 
     ..
     """
-    def __init__(self, tname, connection, key):
+    def __init__(self, tname, connection, key='cat'):
         self.tname = tname
         self.conn = connection
         self.key = key
@@ -207,7 +207,7 @@ class Columns(object):
                 odict[name] = ctype
             self.odict = odict
 
-    def sql_descr(self, remove = None):
+    def sql_descr(self, remove=None):
         """Return a string with description of columns.
            Remove it is used to remove a columns.::
 
@@ -215,19 +215,20 @@ class Columns(object):
             >>> path = '$GISDBASE/$LOCATION_NAME/$MAPSET/sqlite.db'
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
-            >>> cols_sqlite.sql_descr()
-
+            >>> cols_sqlite.sql_descr()                   # doctest: +ELLIPSIS
+            u'cat integer, OBJECTID integer, AREA double precision, ...'
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
-            >>> cols_pg.sql_descr()                           # doctest: +ELLIPSIS
-
+            >>> cols_pg.sql_descr()                       # doctest: +ELLIPSIS
+            'cat int4, objectid int4, area float8, perimeter float8, ...'
         """
         if remove:
             return ', '.join(['%s %s' % (key, val) for key, val in self.items()
-                            if key != remove])
+                             if key != remove])
         else:
-            return ', '.join(['%s %s' % (key, val) for key, val in self.items()])
+            return ', '.join(['%s %s' % (key, val)
+                              for key, val in self.items()])
 
     def types(self):
         """Return a list with the column types. ::
@@ -237,7 +238,7 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.types()                       # doctest: +ELLIPSIS
-            [u'integer', u'integer', ..., u'double precision']
+            [u'integer', u'integer', ...]
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -249,7 +250,7 @@ class Columns(object):
         """
         return self.odict.values()
 
-    def names(self, remove = None, unicod = True):
+    def names(self, remove=None, unicod=True):
         """Return a list with the column names.
            Remove it is used to remove a columns.::
 
@@ -258,7 +259,7 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.names()                      # doctest: +ELLIPSIS
-            [u'cat', u'OBJECTID', u'AREA', u'PERIMETER', ..., u'ACRES']
+            [u'cat', u'OBJECTID', u'AREA', u'PERIMETER', ...]
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -286,7 +287,7 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.items()                       # doctest: +ELLIPSIS
-            [(u'cat', u'integer'), ..., (u'ACRES', u'double precision')]
+            [(u'cat', u'integer'), ...]
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -304,10 +305,10 @@ class Columns(object):
             >>> path = '$GISDBASE/$LOCATION_NAME/$MAPSET/sqlite.db'
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
-            >>> cols_sqlite.add('n_pizza', 'int4')        # doctest: +ELLIPSIS
-            >>> 'n_pizza' in cols_pg
+            >>> cols_sqlite.add('n_pizza', 'int4')
+            >>> 'n_pizza' in cols_sqlite
             True
-           
+
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -333,9 +334,9 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.rename('n_pizza', 'n_pizzas')  # doctest: +ELLIPSIS
-            >>> 'n_pizza' in cols_pg
+            >>> 'n_pizza' in cols_sqlite
             False
-            >>> 'n_pizzas' in cols_pg
+            >>> 'n_pizzas' in cols_sqlite
             True
 
             >>> import psycopg2 as pg
@@ -411,7 +412,7 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.drop('n_pizzas')  # doctest: +ELLIPSIS
-            >>> 'n_pizzas' in cols_pg
+            >>> 'n_pizzas' in cols_sqlite
             False
 
             >>> import psycopg2 as pg
@@ -431,14 +432,15 @@ class Columns(object):
             desc = str(self.sql_descr(remove=col_name))
             names = ', '.join(self.names(remove=col_name, unicod=False))
             queries = sql.DROP_COL_SQLITE.format(tname=self.tname,
-                                                 keycol = self.key,
-                                                 coldef = desc,
-                                                 colnames = names).split('\n')
+                                                 keycol=self.key,
+                                                 coldef=desc,
+                                                 colnames=names).split('\n')
             for query in queries:
                 cur.execute(query)
         self.conn.commit()
         cur.close()
         self.update_odict()
+
 
 class Link(object):
     """Define a Link between vector map and the attributes table.
@@ -748,8 +750,9 @@ class Table(object):
         'boundary_municp_sqlite'
         >>> import psycopg2
         >>> tab_pg = Table('boundary_municp_pg',
-        ...                psycopg2.connect('host=localhost dbname=grassdb', 'pg'))
-        >>> tab_pg.columns                                    # doctest: +ELLIPSIS
+        ...                psycopg2.connect('host=localhost dbname=grassdb',
+        ...                                 'pg'))
+        >>> tab_pg.columns                                # doctest: +ELLIPSIS
         Columns([('cat', 'int4'), ...])
 
     ..
@@ -767,7 +770,7 @@ class Table(object):
 
     name = property(fget=_get_name, fset=_set_name)
 
-    def __init__(self, name, connection, key):
+    def __init__(self, name, connection, key='cat'):
         self._name = name
         self.conn = connection
         self.key = key
@@ -778,10 +781,15 @@ class Table(object):
 
     def __repr__(self):
         """::
-            
-            >>> tab_sqlite = Table('boundary_municp_sqlite')
-            
-        ..    
+
+            >>> import sqlite3
+            >>> path = '$GISDBASE/$LOCATION_NAME/$MAPSET/sqlite.db'
+            >>> tab_sqlite = Table(name='boundary_municp_sqlite',
+            ...                    connection=sqlite3.connect(get_path(path)))
+            >>> tab_sqlite
+            Table('boundary_municp_sqlite')
+
+        ..
         """
         return "Table(%r)" % (self.name)
 

@@ -20,7 +20,7 @@ It is a collection of strings to avoid to repeat the code. ::
 
 #ALTER TABLE
 ADD_COL = "ALTER TABLE {tname} ADD COLUMN {cname} {ctype};"
-DROP_COL = "ALTER tname {tname} DROP COLUMN {cname};"
+DROP_COL = "ALTER TABLE {tname} DROP COLUMN {cname};"
 DROP_COL_SQLITE = ';\n'.join([
 "CREATE TEMPORARY TABLE {tname}_backup({coldef})",
 "INSERT INTO {tname}_backup SELECT {colnames} FROM {tname}",
