@@ -14,6 +14,15 @@ from pygrass.errors import GrassError, OpenError
 from table import DBlinks
 
 
+def must_be_open(method):
+    def wrapper(self):
+        if self.is_open():
+            return method(self)
+        else:
+            print "You must open the map."
+    return wrapper
+
+
 #=============================================
 # VECTOR ABSTRACT CLASS
 #=============================================
@@ -23,6 +32,9 @@ class Info(object):
     To get access to the vector info the map must be opened. ::
 
         >>> municip = Info('boundary_municp', 'PERMANENT')
+        >>> municip.full_name
+        You must open the map.
+
         >>> municip.open()
 
     Then it is possible to read and write the following map attributes: ::
@@ -177,14 +189,17 @@ class Info(object):
     thresh = property(fget=_get_thresh, fset=_set_thresh)
 
     @property
+    @must_be_open
     def full_name(self):
         return libvect.Vect_get_full_name(self.c_mapinfo)
 
     @property
+    @must_be_open
     def maptype(self):
         return MAPTYPE[libvect.Vect_maptype(self.c_mapinfo)]
 
     @property
+    @must_be_open
     def proj_name(self):
         return libvect.Vect_get_proj_name(self.c_mapinfo)
 
@@ -216,7 +231,7 @@ class Info(object):
     def open(self, mode='r', layer='0', overwrite=None):
         """::
 
-            >>> mun = Vector('boundary_municp_sqlite')
+            >>> mun = Info('boundary_municp_sqlite')
             >>> mun.open()
             >>> mun.is_open()
             True
