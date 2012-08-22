@@ -315,9 +315,6 @@ class Columns(object):
             >>> 'n_pizza' in cols_pg
             True
 
-        .. warning ::
-
-            It is not possible to remove/rename a column with sqlite
         ..
         """
         cur = self.conn.cursor()
@@ -336,9 +333,11 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.rename('n_pizza', 'n_pizzas')  # doctest: +ELLIPSIS
-            Traceback (most recent call last):
-              ...
-            DBError: 'SQLite does not support to rename columns.'
+            >>> 'n_pizza' in cols_pg
+            False
+            >>> 'n_pizzas' in cols_pg
+            True
+
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -348,10 +347,6 @@ class Columns(object):
             >>> 'n_pizzas' in cols_pg
             True
 
-
-        .. warning ::
-
-            It is not possible to add/remove/rename a column with sqlite
         ..
         """
         cur = self.conn.cursor()
@@ -394,7 +389,7 @@ class Columns(object):
 
         .. warning ::
 
-            It is not possible to add/remove/rename/cast a column with sqlite
+            It is not possible to cast a column with sqlite
         ..
         """
         if self.is_pg():
@@ -416,9 +411,9 @@ class Columns(object):
             >>> cols_sqlite = Columns('boundary_municp_sqlite',
             ...                       sqlite3.connect(get_path(path)))
             >>> cols_sqlite.drop('n_pizzas')  # doctest: +ELLIPSIS
-            Traceback (most recent call last):
-              ...
-            DBError: 'SQLite does not support to drop columns.'
+            >>> 'n_pizzas' in cols_pg
+            False
+
             >>> import psycopg2 as pg
             >>> cols_pg = Columns('boundary_municp_pg',
             ...                   pg.connect('host=localhost dbname=grassdb'))
@@ -426,9 +421,6 @@ class Columns(object):
             >>> 'n_pizzas' in cols_pg
             False
 
-        .. warning ::
-
-            It is not possible to add/remove/rename a column with sqlite
         ..
         """
         cur = self.conn.cursor()
