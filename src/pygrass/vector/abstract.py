@@ -272,3 +272,9 @@ class Info(object):
             if libvect.Vect_close(self.c_mapinfo) != 0:
                 str_err = 'Error when trying to close the map with Vect_close'
                 raise GrassError(str_err)
+
+    def remove(self):
+        """Remove vector map"""
+        if self.is_open():
+            self.close()
+        env.remove(vect=self.name)
