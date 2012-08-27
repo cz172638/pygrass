@@ -16,7 +16,7 @@ class History(object):
     ::
 
         >>> import pygrass
-        >>> hist = pygrass.History()
+        >>> hist = pygrass.raster.History()
         >>> hist.read('aspect')
         >>> hist.creator
         'helena'
@@ -213,6 +213,7 @@ class History(object):
             >>> libraster.Rast_read_history(ctypes.c_char_p('aspect'),
             ...                             ctypes.c_char_p(''),
             ...                             ctypes.byref(hist))
+            0
             >>> libraster.Rast_get_history(ctypes.byref(hist),
             ...                            libraster.HIST_MAPID)
             'Tue Nov  7 01:11:23 2006'

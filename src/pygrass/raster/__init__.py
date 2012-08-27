@@ -34,6 +34,7 @@ from buffer import Buffer
 from segment import Segment
 from rowio import RowIO
 from category import Category
+from history import History
 
 class RasterRow(RasterAbstractBase):
     """Raster_row_access": Inherits: "Raster_abstract_base" and implements
