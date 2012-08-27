@@ -11,8 +11,6 @@ import optparse
 
 from grass.script import core as grasscore
 
-DBNAME = 'pygrassdb_doctest'
-
 def read_gisrc(gisrcpath):
     gisrc = open(gisrcpath, 'r')
     diz = {}
@@ -32,17 +30,18 @@ def main():
                       help="PostgreSQL user [default=%default]")
     parser.add_option("-P", "--password", dest="passwd", default=None,
                       help="PostgreSQL password for user [default=%default]")
-    parser.add_option("-D", "--database", dest="db", default=DBNAME,
+    parser.add_option("-D", "--database", dest="db", default='pygrassdb_doctest',
                       help="PostgreSQL database name [default=%default]")                      
                       
     (opts, args) = parser.parse_args()
     #
     # Create DB
     #
-    print("\n\nCreate a new DB: %s...\n" % DBNAME)
+    print("\n\nCreate a new DB: %s...\n" % opts.db)
     createdb = ['createdb', '--encoding=UTF-8', '--owner=%s' % opts.user,
-                '--host=localhost', '--username=%s' % opts.user, DBNAME]
+                '--host=localhost', '--username=%s' % opts.user, opts.db]
     if opts.passwd:
+        print opts.passwd
         createdb.append("--password=%s" % opts.passwd)
     else:
         createdb.append("--no-password")
@@ -53,9 +52,9 @@ def main():
     #
     print("\n\nSet Postgres connection...\n")
     grasscore.run_command('db.connect', driver='pg',
-                          database='host=localhost,dbname=%s' % DBNAME)
+                          database='host=localhost,dbname=%s' % opts.db)
     
-    grasscore.run_command('db.login', user=os.environ['USER'])
+    grasscore.run_command('db.login', user=opts.user)
     print("\n\nCopy the map from PERMANENT to user1...\n")
     grasscore.run_command('g.copy',
                           vect="boundary_municp@PERMANENT,boundary_municp_pg",
