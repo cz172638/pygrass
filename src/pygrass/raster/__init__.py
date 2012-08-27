@@ -108,6 +108,8 @@ class RasterRow(RasterAbstractBase):
         """Private method that return the row using the read mode
         call the `Rast_get_row` C function.
 
+        >>> elev = RasterRow('elevation')
+        >>> elev.open()
         >>> elev[0]                 # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
         Buffer([ 141.99613953, 141.27848816,  141.37904358, ..., 58.40825272,
                  58.30711365,  58.18310547], dtype=float32)
