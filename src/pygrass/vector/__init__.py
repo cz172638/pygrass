@@ -215,19 +215,16 @@ class VectTopo(Vector):
 
         ::
 
-            >>> rail = VectTopo('rail')
-            >>> rail.open()
-            >>> rail.num_primitive_of('line')
-            10837
             >>> municip = VectTopo('boundary_municp_sqlite')
             >>> municip.open()
+            >>> municip.num_primitive_of('point')
+            0
             >>> municip.num_primitive_of('line')
             0
             >>> municip.num_primitive_of('centroid')
             3579
             >>> municip.num_primitive_of('boundary')
             5128
-            >>> rail.close()
             >>> municip.close()
 
         ..
