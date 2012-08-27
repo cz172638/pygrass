@@ -64,8 +64,8 @@ class RasterRow(RasterAbstractBase):
         >>> elev.open()
         >>> elev.is_open()
         True
-        >>> elev.cols
-        1500
+        >>> type(elev.cols)
+        <type 'int'>
         >>> elev.has_cats()
         False
         >>> elev.mode
@@ -455,7 +455,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
     * Be aware of the 2Gig file size limit
 
     >>> import pygrass
-    >>> elev = pygrass.RasterNumpy('elevation')
+    >>> elev = pygrass.raster.RasterNumpy('elevation')
     >>> elev.open()
     >>> elev[:5, :3]
     RasterNumpy([[ 141.99613953,  141.27848816,  141.37904358],
@@ -470,7 +470,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
        [ True,  True,  True],
        [False, False, False],
        [False, False, False]], dtype=bool)
-    >>> el._write('new', overwrite = True)
+    >>> el._write()
 
     """
     def __new__(cls, name, mapset="", mtype='CELL', mode='r+',
