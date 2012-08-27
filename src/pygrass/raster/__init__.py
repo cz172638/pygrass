@@ -33,7 +33,7 @@ from raster_type import TYPE as RTYPE, RTYPE_STR
 from buffer import Buffer
 from segment import Segment
 from rowio import RowIO
-
+from category import Category
 
 class RasterRow(RasterAbstractBase):
     """Raster_row_access": Inherits: "Raster_abstract_base" and implements
