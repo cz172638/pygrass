@@ -471,6 +471,7 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
        [False, False, False],
        [False, False, False]], dtype=bool)
     >>> el._write()
+    0
 
     """
     def __new__(cls, name, mapset="", mtype='CELL', mode='r+',
@@ -594,6 +595,9 @@ class RasterNumpy(np.memmap, RasterAbstractBase):
 
         #import pdb; pdb.set_trace()
         if self.mode in ('w+', 'r+'):
+            if not self._name:
+                import os
+                self._name = "doctest_%i" % os.getpid()
             ret = grasscore.run_command('r.in.bin', flags=kind,
                                         input=self.filename, output=self._name,
                                         title=self.title, bytes=size,
