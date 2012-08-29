@@ -7,7 +7,12 @@ Created on Thu Jul 12 10:23:15 2012
 """
 from __future__ import print_function
 import subprocess
-import collections
+
+try:
+    from collections import OrderedDict
+except:
+    from pygrass.orderdict import OrderedDict
+
 from itertools import izip_longest
 from xml.etree.ElementTree import fromstring
 import numpy as np
@@ -212,7 +217,7 @@ class Parameter(object):
                        if self.values else '')
 
 
-class TypeDict(collections.OrderedDict):
+class TypeDict(OrderedDict):
     def __init__(self, dict_type, *args, **kargs):
         self.type = dict_type
         super(TypeDict, self).__init__(*args, **kargs)

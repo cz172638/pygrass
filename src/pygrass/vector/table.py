@@ -8,7 +8,11 @@ Created on Wed Aug  8 15:29:21 2012
 
 """
 import ctypes
-from collections import OrderedDict
+
+try:
+    from collections import OrderedDict
+except:
+    from pygrass.orderdict import OrderedDict
 
 import grass.lib.vector as libvect
 import grass.script.core as core
