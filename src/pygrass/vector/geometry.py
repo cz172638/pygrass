@@ -850,7 +850,7 @@ class Centroid(Point):
         >>> centroid
         Centoid(0.000000, 10.000000)
         >>> import pygrass
-        >>> mun = pygrass.vector.VectTopo('boundary_municp_sqlite')
+        >>> mun = pygrass.vector.VectorTopo('boundary_municp_sqlite')
         >>> mun.open()
         >>> centroid = Centroid(v_id=5129, c_mapinfo=mun.c_mapinfo)
         >>> centroid

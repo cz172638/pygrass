@@ -175,11 +175,11 @@ class Vector(Info):
 # VECTOR WITH TOPOLOGY
 #=============================================
 
-class VectTopo(Vector):
+class VectorTopo(Vector):
     def __init__(self, name, mapset=''):
-        super(VectTopo, self).__init__(name, mapset)
+        super(VectorTopo, self).__init__(name, mapset)
         self._topo_level = 2
-        self._class_name = 'VectTopo'
+        self._class_name = 'VectorTopo'
 
     def __len__(self):
         return libvect.Vect_get_num_lines(self.c_mapinfo)
@@ -187,7 +187,7 @@ class VectTopo(Vector):
     def __getitem__(self, key):
         """::
 
-            >>> mun = VectTopo('boundary_municp_sqlite')
+            >>> mun = VectorTopo('boundary_municp_sqlite')
             >>> mun.open()
             >>> mun[:3]
             [Boundary(v_id=1), Boundary(v_id=2), Boundary(v_id=3)]
@@ -217,7 +217,7 @@ class VectTopo(Vector):
 
         ::
 
-            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> municip = VectorTopo('boundary_municp_sqlite')
             >>> municip.open()
             >>> municip.num_primitive_of('point')
             0
@@ -240,7 +240,7 @@ class VectTopo(Vector):
                   "line_points", "lines", "nodes", "update_lines",
                   "update_nodes", "volumes"]
 
-            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> municip = VectorTopo('boundary_municp_sqlite')
             >>> municip.open()
             >>> municip.number_of("areas")
             3579
@@ -275,7 +275,7 @@ class VectTopo(Vector):
         """Return an iterator of vector features
 
         ::
-            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> municip = VectorTopo('boundary_municp_sqlite')
             >>> municip.open()
             >>> big = [area for area in municip.viter('areas')
             ...        if area.alive() and area.area >= 10000]
@@ -307,7 +307,7 @@ class VectTopo(Vector):
     def rewind(self):
         """Rewind vector map to cause reads to start at beginning. ::
 
-            >>> mun = VectTopo('boundary_municp_sqlite')
+            >>> mun = VectorTopo('boundary_municp_sqlite')
             >>> mun.open()
             >>> mun.next()
             Boundary(v_id=1)
@@ -327,7 +327,7 @@ class VectTopo(Vector):
     def read(self, feature_id):
         """Return a geometry object given the feature id. ::
 
-            >>> mun = VectTopo('boundary_municp_sqlite')
+            >>> mun = VectorTopo('boundary_municp_sqlite')
             >>> mun.open()
             >>> feature1 = mun.read(0)                     #doctest: +ELLIPSIS
             Traceback (most recent call last):

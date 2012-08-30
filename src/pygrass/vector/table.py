@@ -642,8 +642,8 @@ class Link(object):
 class DBlinks(object):
     """Interface containing link to the table DB. ::
 
-        >>> from pygrass.vector import VectTopo
-        >>> municip = VectTopo('boundary_municp_sqlite')
+        >>> from pygrass.vector import VectorTopo
+        >>> municip = VectorTopo('boundary_municp_sqlite')
         >>> municip.open()
         >>> dblinks = DBlinks(municip.c_mapinfo)
         >>> dblinks
@@ -698,8 +698,8 @@ class DBlinks(object):
     def add(self, link):
         """Add a new link. ::
 
-            >>> from pygrass.vector import VectTopo
-            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> from pygrass.vector import VectorTopo
+            >>> municip = VectorTopo('boundary_municp_sqlite')
             >>> municip.open()
             >>> dblinks = DBlinks(municip.c_mapinfo)
             >>> dblinks
@@ -720,8 +720,8 @@ class DBlinks(object):
     def remove(self, key):
         """Remove a link. ::
 
-            >>> from pygrass.vector import VectTopo
-            >>> municip = VectTopo('boundary_municp_sqlite')
+            >>> from pygrass.vector import VectorTopo
+            >>> municip = VectorTopo('boundary_municp_sqlite')
             >>> municip.open()
             >>> dblinks = DBlinks(municip.c_mapinfo)
             >>> dblinks
