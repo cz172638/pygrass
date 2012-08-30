@@ -10,7 +10,8 @@ import os as _os
 import sys as _sys
 
 _pygrasspath = _os.path.dirname(_os.path.realpath( __file__ )).split(_os.sep)
-_sys.path.insert(0, _os.path.join(_pygrasspath[:-1]))
+
+_sys.path.append(_os.path.join(_os.sep,*_pygrasspath[:-1]))
 
 import region
 import raster
