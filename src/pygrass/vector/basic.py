@@ -245,7 +245,7 @@ class Ilist(object):
             raise ValueError("Invalid argument type: %r." % key)
 
     def __setitem__(self, key, value):
-        if self.contins(value):
+        if self.contains(value):
             raise ValueError('Integer already in the list')
         self.c_ilist.contents.value[key] = int(value)
 
@@ -288,15 +288,15 @@ class Ilist(object):
         else:
             raise ValueError('Value: %r, is not supported' % value)
 
-    def contins(self, value):
+    def contains(self, value):
         """Check if value is in the list"""
         return bool(libvect.Vect_val_in_list(self.c_ilist, value))
 
 
 class Cats(object):
-    """Instantiate a Category class that contain a ctypes pointer
-    to the Map_info C struct, and a ctypes pointer to tha C cats struct,
-    that could be use by C functions.
+    """Instantiate a Category class that contains a ctypes pointer
+    to the Map_info C struct, and a ctypes pointer to that C cats struct,
+    that could be used by C functions.
     """
 
     def __init__(self, c_mapinfo, v_id, c_cats=None):

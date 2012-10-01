@@ -73,7 +73,7 @@ then you can go on with python stuff like, sort by area dimension: ::
     Area(2552) 298356117.948
 
 
-or sort for the number of isles that ar contained inside: ::
+or sort for the number of isles that are contained inside: ::
 
     >>> big.sort(key = lambda x: x.isles.__len__(), reverse = True)
     >>> for area in big[:3]:
@@ -117,7 +117,7 @@ Now, find an area with an island inside... ::
 VectorTopo
 ----------
 
-.. autoclass:: pygrass.vector.VectTopo
+.. autoclass:: pygrass.vector.VectorTopo
     :members:
 
 Vector

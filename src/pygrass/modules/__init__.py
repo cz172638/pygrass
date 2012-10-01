@@ -327,7 +327,7 @@ class Module(object):
         os = 'linux'
         language = 'python'
 
-    In the Module class we heavly use this language feature to pass arguments
+    In the Module class we heavily use this language feature to pass arguments
     and keyword arguments to the grass module.
     """
     def __init__(self, cmd, *args, **kargs):
@@ -337,7 +337,7 @@ class Module(object):
                                        stdout=subprocess.PIPE)
         # get the xml of the module
         self.xml = get_cmd_xml.communicate()[0]
-        # transform and parse the xml into an Elemen class:
+        # transform and parse the xml into an Element class:
         # http://docs.python.org/library/xml.etree.elementtree.html
         tree = fromstring(self.xml)
 
@@ -473,7 +473,7 @@ class Module(object):
              (' ' * (len(self.name) + 1))).join([', '.join(
              # transform each parameter in string
              [str(param) for param in line if param is not None])
-             # smake a list of parameters with only 3 param per line
+             # make a list of parameters with only 3 param per line
              for line in izip_longest(*[iter(self.params_list)] * 3)]),)
         params = '\n'.join([par.__doc__ for par in self.params_list])
         flags = self.flags_dict.__doc__

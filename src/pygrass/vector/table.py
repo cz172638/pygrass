@@ -114,7 +114,7 @@ class Filters(object):
 class Columns(object):
     """Object to work with columns table.
 
-    It is possble to instantiate a Columns object given the table name and
+    It is possible to instantiate a Columns object given the table name and
     the database connection.
 
     For a sqlite table: ::

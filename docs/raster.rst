@@ -28,7 +28,7 @@ Class Name                  C library                Read      Write
 
 All these classes share common methods and attributes, necessary to address
 common tasks as rename, remove, open, close, exist, is_open.
-In the next exmples we instantiate a RasterRow object. ::
+In the next examples we instantiate a RasterRow object. ::
 
     >>> from pygrass import raster
     >>> elev = raster.RasterRow('elevation')
